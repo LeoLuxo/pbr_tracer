@@ -1,4 +1,5 @@
 pub mod core;
+pub mod rendering;
 pub mod util;
 
 use core::{display::DisplayPlugin, event::EventPlugin, gameloop::GameloopPlugin};

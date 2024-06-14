@@ -94,7 +94,6 @@ pub struct Gpu {
 */
 
 impl AppWindow {
-	#[must_use]
 	pub fn new(event_loop: &EventLoop, settings: &WindowSettings) -> Self {
 		let window = WindowBuilder::new()
 			.with_title(settings.title)
