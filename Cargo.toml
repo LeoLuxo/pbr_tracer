@@ -6,13 +6,18 @@ version      = "0.1.0"
 
 
 [dependencies]
-brainrot = { path = "../brainrot", features = ["bevy"] }
+brainrot = { path = "../brainrot", features = ["bevy", "convert", "macros", "vek"] }
 
 bevy_ecs   = "=0.13.2"
 bevy_tasks = { version = "=0.13.2", features = ["multi-threaded"] }
 
-wgpu  = "=0.20.1"
-winit = "=0.30.1"
+egui       = { version = "=0.27.2", features = ["bytemuck", "mint"] }
+egui-wgpu  = { version = "=0.27.2", features = ["winit"] }
+egui-winit = { version = "=0.27.2" }
+wgpu       = "=0.19.1"
+winit      = { version = "=0.29.4", features = ["rwh_05"] }
+
 
 env_logger = "0.11"
 log        = "0.4"
+pollster   = "0.3.0"

@@ -1,13 +1,38 @@
+pub mod core;
+pub mod util;
+
+use core::{display::DisplayPlugin, event::EventPlugin, gameloop::GameloopPlugin};
+
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::bevy::App;
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+pub trait EntityLabel {}
+
+// Some extra useful types
+
+/// The default `EventLoop` type to avoid having to add the extra unit type
+type EventLoop = winit::event_loop::EventLoop<()>;
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
 
 pub fn run() {
 	AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
 	App::new()
-		// .add_plugin(GameloopPlugin)
-		// .add_plugin(EventPlugin)
-		// .add_plugin(DisplayPlugin)p
+		// Core plugins
+		.add_plugin(GameloopPlugin)
+		.add_plugin(EventPlugin)
+		.add_plugin(DisplayPlugin)
 		// // Rendering plugins
 		// .add_plugin(WindowRenderTargetPlugin)
 		// .add_plugin(TerrainRendererPlugin)
