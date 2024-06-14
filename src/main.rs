@@ -1,3 +1,10 @@
+use log::LevelFilter;
+
 fn main() {
-	println!("Hello, world!");
+	env_logger::Builder::new()
+		.filter_level(LevelFilter::Error)
+		.filter_module("pathtracer", LevelFilter::Debug)
+		.init();
+
+	pathtracer::run();
 }

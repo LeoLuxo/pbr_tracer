@@ -1,7 +1,18 @@
 [package]
-name = "pathtracer"
-version = "0.1.0"
-edition = "2021"
+edition      = "2021"
+name         = "pathtracer"
+rust-version = "1.79"
+version      = "0.1.0"
 
 
 [dependencies]
+brainrot = { path = "../brainrot", features = ["bevy"] }
+
+bevy_ecs   = "=0.13.2"
+bevy_tasks = { version = "=0.13.2", features = ["multi-threaded"] }
+
+wgpu  = "=0.20.1"
+winit = "=0.30.1"
+
+env_logger = "0.11"
+log        = "0.4"
