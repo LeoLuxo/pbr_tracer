@@ -329,8 +329,8 @@ fn schedule_game_iteration(world: &mut World) {
 
 	if should_render {
 		world.insert_resource(time);
-		world.run_schedule(PreRender);
-		world.run_schedule(Render);
+		let _ = world.try_run_schedule(PreRender);
+		let _ = world.try_run_schedule(Render);
 
 		// Update FPS info; above comment about UPS also applies here
 		time.fps = 1. / (now - time.last_render_time).as_secs_f32();
