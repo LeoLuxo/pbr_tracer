@@ -14,6 +14,7 @@ use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::bevy::App;
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
+	compute::{ComputeRenderPass, ComputeRendererPlugin},
 	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
 };
 
@@ -49,12 +50,13 @@ pub fn run() {
 		// Rendering plugins
 		.add_plugin(RenderPlugin)
 		.add_plugin(ComposeRendererPlugin)
+		.add_plugin(ComputeRendererPlugin)
 		// Configure Renderpass order
 		.configure_sets(
 			Render,
 			((
 				PreRenderPass,
-				(ComposeRenderPass,).chain().in_set(InnerRenderPass),
+				(ComposeRenderPass, ComputeRenderPass).chain().in_set(InnerRenderPass),
 				PostRenderPass,
 			)
 				.chain()

@@ -47,7 +47,7 @@ pub struct ComposeRenderPass;
 
 #[derive(bevy::Resource)]
 pub struct ComposeRenderer {
-	render_pipeline: RenderPipeline,
+	pipeline: RenderPipeline,
 }
 
 impl ComposeRenderer {
@@ -58,51 +58,49 @@ impl ComposeRenderer {
 			.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
 
 		// Create the render pipeline. Specify shader stages, primitive type, stencil/depth information, and some more stuff.
-		let render_pipeline = {
-			gpu.device.create_render_pipeline(&RenderPipelineDescriptor {
-				label: Some("Basic Render Pipeline"),
-				layout: None,
-				// No vertex buffers, we'll render 2 fullscreen triangles
-				// and set their positions in the shader
-				vertex: VertexState {
-					module: &shader,
-					entry_point: "vs_main",
-					buffers: &[],
-				},
-				fragment: Some(FragmentState {
-					module: &shader,
-					entry_point: "fs_main",
-					targets: &[Some(ColorTargetState {
-						format: render_target.config.format,
-						blend: Some(BlendState::REPLACE),
-						write_mask: ColorWrites::ALL,
-					})],
-				}),
-				// The point is to draw 2 triangles using 4 vertices.
-				// 1 -- 2
-				// | /  |
-				// 3 -- 4
-				primitive: PrimitiveState {
-					topology: PrimitiveTopology::TriangleStrip,
-					strip_index_format: None,
-					front_face: FrontFace::Ccw,
-					cull_mode: None,
-					polygon_mode: PolygonMode::Fill,
-					unclipped_depth: false,
-					conservative: true,
-				},
-				// Don't worry about the depth buffer for now
-				depth_stencil: None,
-				multisample: MultisampleState {
-					count: 1,
-					mask: !0,
-					alpha_to_coverage_enabled: false,
-				},
-				multiview: None,
-			})
-		};
+		let pipeline = gpu.device.create_render_pipeline(&RenderPipelineDescriptor {
+			label: Some("Basic Render Pipeline"),
+			layout: None,
+			// No vertex buffers, we'll render 2 fullscreen triangles
+			// and set their positions in the shader
+			vertex: VertexState {
+				module: &shader,
+				entry_point: "vs_main",
+				buffers: &[],
+			},
+			fragment: Some(FragmentState {
+				module: &shader,
+				entry_point: "fs_main",
+				targets: &[Some(ColorTargetState {
+					format: render_target.config.format,
+					blend: Some(BlendState::REPLACE),
+					write_mask: ColorWrites::ALL,
+				})],
+			}),
+			// The point is to draw 2 triangles using 4 vertices.
+			// 1 -- 2
+			// | /  |
+			// 3 -- 4
+			primitive: PrimitiveState {
+				topology: PrimitiveTopology::TriangleStrip,
+				strip_index_format: None,
+				front_face: FrontFace::Ccw,
+				cull_mode: None,
+				polygon_mode: PolygonMode::Fill,
+				unclipped_depth: false,
+				conservative: true,
+			},
+			// Don't worry about the depth buffer for now
+			depth_stencil: None,
+			multisample: MultisampleState {
+				count: 1,
+				mask: !0,
+				alpha_to_coverage_enabled: false,
+			},
+			multiview: None,
+		});
 
-		Self { render_pipeline }
+		Self { pipeline }
 	}
 }
 
@@ -128,7 +126,7 @@ fn render(compose_renderer: Res<ComposeRenderer>, mut render_target: ResMut<Rend
 
 		// A render pass records a single pass of a pipeline
 		let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-			label: Some("Render Pass"),
+			label: Some("ComposeRenderer Render Pass"),
 			color_attachments: &[Some(RenderPassColorAttachment {
 				view: render_view,
 				resolve_target: None,
@@ -147,7 +145,7 @@ fn render(compose_renderer: Res<ComposeRenderer>, mut render_target: ResMut<Rend
 			timestamp_writes: None,
 		});
 
-		render_pass.set_pipeline(&compose_renderer.render_pipeline);
+		render_pass.set_pipeline(&compose_renderer.pipeline);
 
 		// Draw 2 fullscreen triangles
 		// 1 -- 2
