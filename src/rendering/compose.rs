@@ -5,7 +5,8 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	src, ScreenSize,
+	engine_3d::ShaderBuilder,
+	shader, src, ScreenSize,
 };
 use velcro::vec;
 use wgpu::{
@@ -18,13 +19,16 @@ use wgpu::{
 };
 
 use super::compute::ComputeRenderer;
-use crate::core::{
-	buffer::{self, UniformBuffer},
-	display::Gpu,
-	event_processing::{EventReaderProcessor, ProcessedChangeEvents},
-	events::WindowResizedEvent,
-	gameloop::{Render, Update},
-	render_target::RenderTarget,
+use crate::{
+	core::{
+		buffer::{self, UniformBuffer},
+		display::Gpu,
+		event_processing::{EventReaderProcessor, ProcessedChangeEvents},
+		events::WindowResizedEvent,
+		gameloop::{Render, Update},
+		render_target::RenderTarget,
+	},
+	SHADER_FILES,
 };
 
 /*
@@ -94,9 +98,13 @@ impl ComposeRenderer {
 		additional_layouts: Vec<&BindGroupLayout>,
 	) -> Self {
 		// Statically include the shader in the executable
-		let shader = gpu
-			.device
-			.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
+		// let shader = gpu
+		// 	.device
+		// 	.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
+		let shader = ShaderBuilder::new()
+			.include(shader!("shader/compose.wgsl"))
+			.build(&gpu.device, &SHADER_FILES)
+			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.
 		// The bind group layout describes the layout of the data.

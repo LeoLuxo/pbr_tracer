@@ -11,22 +11,33 @@ use core::{
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::bevy::App;
+use brainrot::{bevy::App, engine_3d::ShaderFile};
+use once_cell::sync::Lazy;
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
 	compute::{ComputeRenderPass, ComputeRendererPlugin},
 	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
 };
 
+use include_dir::{include_dir, Dir};
 /*
 --------------------------------------------------------------------------------
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
 
-pub trait EntityLabel {}
+static SHADER_FILES: Lazy<Vec<ShaderFile>> = Lazy::new(|| {
+	static DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/shader");
 
-// Some extra useful types
+	DIR.files()
+		.map(|f| ShaderFile {
+			file_name: f.path().to_str().unwrap(),
+			shader_source: f.contents_utf8().unwrap(),
+		})
+		.collect()
+});
+
+pub trait EntityLabel {}
 
 /// The default `EventLoop` type to avoid having to add the extra unit type
 type EventLoop = winit::event_loop::EventLoop<()>;
