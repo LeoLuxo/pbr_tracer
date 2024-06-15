@@ -10,5 +10,5 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f
 
 @fragment
 fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
-	return vec4(frag_coord.xy / 600.0, 0, 1);
+	return vec4(frag_coord.xy / 1600.0, 0, 1);
 }

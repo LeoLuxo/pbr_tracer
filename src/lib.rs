@@ -6,13 +6,16 @@ use core::{
 	event_processing::EventProcessingPlugin,
 	events::EventsPlugin,
 	gameloop::{GameloopPlugin, Render},
-	render_target::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, WindowRenderTargetPlugin},
+	render_target::WindowRenderTargetPlugin,
 };
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::bevy::App;
-use rendering::compose::{ComposeRenderPass, ComposeRendererPlugin};
+use rendering::{
+	compose::{ComposeRenderPass, ComposeRendererPlugin},
+	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -43,16 +46,10 @@ pub fn run() {
 		.add_plugin(GameloopPlugin)
 		.add_plugin(DisplayPlugin)
 		.add_plugin(WindowRenderTargetPlugin)
-		// // Rendering plugins
+		// Rendering plugins
+		.add_plugin(RenderPlugin)
 		.add_plugin(ComposeRendererPlugin)
-		// .add_plugin(WindowRenderTargetPlugin)
-		// .add_plugin(ChunkRendererPlugin)
-		// .add_plugin(DebugRendererPlugin)
-		// .add_plugin(DebugGuiPlugin)
-		// // Universe plugins
-		// .add_plugin(CameraPlugin)
-		// .add_plugin(TerrainPlugin)
-		// // Configure Renderpass order
+		// Configure Renderpass order
 		.configure_sets(
 			Render,
 			((
