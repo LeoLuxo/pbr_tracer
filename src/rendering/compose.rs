@@ -5,15 +5,12 @@ use bevy_ecs::{
 use brainrot::{
 	bevy,
 	bevy::{App, Plugin},
-	engine_3d::TextureAsset,
 	src,
 };
 use wgpu::{
-	include_wgsl, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, CompareFunction,
-	DepthBiasState, DepthStencilState, FragmentState, FrontFace, LoadOp, MultisampleState, Operations,
-	PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
-	RenderPassDepthStencilAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, StencilState,
-	StoreOp, VertexState,
+	include_wgsl, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState, FrontFace,
+	LoadOp, MultisampleState, Operations, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
+	RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, StoreOp, VertexState,
 };
 
 use crate::core::{display::Gpu, gameloop::Render, render_target::RenderTarget};
@@ -60,18 +57,11 @@ impl ComposeRenderer {
 			.device
 			.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
 
-		// Contains the bind group layouts that are needed in the pipeline
-		let render_pipeline_layout = gpu.device.create_pipeline_layout(&PipelineLayoutDescriptor {
-			label: Some("Render Pipeline Layout"),
-			bind_group_layouts: &[],
-			push_constant_ranges: &[],
-		});
-
 		// Create the render pipeline. Specify shader stages, primitive type, stencil/depth information, and some more stuff.
 		let render_pipeline = {
 			gpu.device.create_render_pipeline(&RenderPipelineDescriptor {
 				label: Some("Basic Render Pipeline"),
-				layout: Some(&render_pipeline_layout),
+				layout: None,
 				// No vertex buffers, we'll render 2 fullscreen triangles
 				// and set their positions in the shader
 				vertex: VertexState {
@@ -95,20 +85,14 @@ impl ComposeRenderer {
 				primitive: PrimitiveState {
 					topology: PrimitiveTopology::TriangleStrip,
 					strip_index_format: None,
-					front_face: FrontFace::Cw,
+					front_face: FrontFace::Ccw,
 					cull_mode: None,
 					polygon_mode: PolygonMode::Fill,
 					unclipped_depth: false,
 					conservative: true,
 				},
 				// Don't worry about the depth buffer for now
-				depth_stencil: Some(DepthStencilState {
-					format: TextureAsset::DEPTH_FORMAT,
-					depth_write_enabled: false,
-					depth_compare: CompareFunction::Always,
-					stencil: StencilState::default(),
-					bias: DepthBiasState::default(),
-				}),
+				depth_stencil: None,
 				multisample: MultisampleState {
 					count: 1,
 					mask: !0,
@@ -158,14 +142,7 @@ fn render(compose_renderer: Res<ComposeRenderer>, mut render_target: ResMut<Rend
 					store: StoreOp::Store,
 				},
 			})],
-			depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-				view: &render_target.depth_texture.view,
-				depth_ops: Some(Operations {
-					load: LoadOp::Clear(1.0),
-					store: StoreOp::Store,
-				}),
-				stencil_ops: None,
-			}),
+			depth_stencil_attachment: None,
 			occlusion_query_set: None,
 			timestamp_writes: None,
 		});

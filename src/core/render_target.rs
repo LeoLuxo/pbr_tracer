@@ -7,7 +7,6 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	engine_3d::TextureAsset,
 	math::Converter,
 	ScreenSize,
 };
@@ -88,7 +87,6 @@ pub struct RenderTarget<'a> {
 
 	current_texture: Option<SurfaceTexture>,
 	pub current_view: Option<TextureView>,
-	pub depth_texture: TextureAsset,
 }
 
 impl<'a> RenderTarget<'a> {
@@ -130,9 +128,6 @@ impl<'a> RenderTarget<'a> {
 
 		surface.configure(&gpu.device, &config);
 
-		// In wgpu, the depth buffer has to be explicitly created
-		let depth_texture = TextureAsset::create_depth_texture(&gpu.device, size, Some("Depth texture"));
-
 		Self {
 			surface,
 			size,
@@ -141,7 +136,6 @@ impl<'a> RenderTarget<'a> {
 			command_queue: vec![],
 			current_texture: None,
 			current_view: None,
-			depth_texture,
 		}
 	}
 }
@@ -192,6 +186,5 @@ fn resize(
 		render_target.config.width = size.w;
 		render_target.config.height = size.h;
 		render_target.surface.configure(&gpu.device, &render_target.config);
-		render_target.depth_texture = TextureAsset::create_depth_texture(&gpu.device, size, Some("Depth Texture"));
 	}
 }
