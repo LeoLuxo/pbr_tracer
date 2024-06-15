@@ -1,6 +1,6 @@
 [package]
 edition      = "2021"
-name         = "pathtracer"
+name         = "pbr_tracer"
 rust-version = "1.79"
 version      = "0.1.0"
 
