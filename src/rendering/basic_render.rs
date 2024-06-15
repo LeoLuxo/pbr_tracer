@@ -1,7 +1,7 @@
 use bevy_ecs::schedule::IntoSystemConfigs;
 use bevy_ecs::system::{Res, ResMut};
 use brainrot::bevy::{App, Plugin};
-use brainrot::engine_3d::Texture;
+use brainrot::engine_3d::TextureAsset;
 use brainrot::{bevy, src};
 use wgpu::{
 	include_wgsl, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, CompareFunction,
@@ -101,7 +101,7 @@ impl BasicRenderer {
 				},
 				// Don't worry about the depth buffer for now
 				depth_stencil: Some(DepthStencilState {
-					format: Texture::DEPTH_FORMAT,
+					format: TextureAsset::DEPTH_FORMAT,
 					depth_write_enabled: false,
 					depth_compare: CompareFunction::Always,
 					stencil: StencilState::default(),
