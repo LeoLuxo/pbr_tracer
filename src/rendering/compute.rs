@@ -1,9 +1,11 @@
-use bevy_ecs::{schedule::IntoSystemConfigs, system::Res};
+use bevy_ecs::{
+	schedule::IntoSystemConfigs,
+	system::{Res, ResMut},
+};
 use brainrot::{
 	bevy::{self, App, Plugin},
 	engine_3d::TextureAsset,
 	src,
-	vek::Extent2,
 };
 use wgpu::{
 	include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
@@ -11,7 +13,7 @@ use wgpu::{
 	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
 };
 
-use crate::core::{display::Gpu, gameloop::Render};
+use crate::core::{display::Gpu, gameloop::Render, render_target::RenderTarget};
 
 /*
 --------------------------------------------------------------------------------
@@ -59,7 +61,7 @@ impl ComputeRenderer {
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
 			(20, 10).into(),
-			FilterMode::Nearest,
+			FilterMode::Linear,
 			TextureFormat::Rgba32Float,
 			Some("Output texture"),
 		);
@@ -104,8 +106,8 @@ impl ComputeRenderer {
 --------------------------------------------------------------------------------
 */
 
-fn render(compute_renderer: Res<ComputeRenderer>, gpu: Res<Gpu>) {
-	let mut command_encoder = gpu.device.create_command_encoder(&CommandEncoderDescriptor {
+fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<RenderTarget<'static>>, gpu: Res<Gpu>) {
+	let mut encoder = gpu.device.create_command_encoder(&CommandEncoderDescriptor {
 		label: Some("ComputeRenderer Command Encoder"),
 	});
 
@@ -122,7 +124,7 @@ fn render(compute_renderer: Res<ComputeRenderer>, gpu: Res<Gpu>) {
 	let out_height = compute_renderer.output_texture.texture.height();
 
 	{
-		let mut compute_pass = command_encoder.begin_compute_pass(&ComputePassDescriptor {
+		let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
 			label: Some("ComputeRenderer Compute Pass"),
 			timestamp_writes: None,
 		});
@@ -133,4 +135,6 @@ fn render(compute_renderer: Res<ComputeRenderer>, gpu: Res<Gpu>) {
 
 		compute_pass.dispatch_workgroups(out_width, out_height, 1);
 	}
+
+	render_target.command_queue.push(encoder.finish());
 }

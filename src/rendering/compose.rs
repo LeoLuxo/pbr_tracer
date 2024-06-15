@@ -17,6 +17,7 @@ use wgpu::{
 	VertexState,
 };
 
+use super::compute::ComputeRenderer;
 use crate::core::{
 	buffer::{self, UniformBuffer},
 	display::Gpu,
@@ -25,8 +26,6 @@ use crate::core::{
 	gameloop::{Render, Update},
 	render_target::RenderTarget,
 };
-
-use super::compute::ComputeRenderer;
 
 /*
 --------------------------------------------------------------------------------

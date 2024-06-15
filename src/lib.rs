@@ -56,7 +56,7 @@ pub fn run() {
 			Render,
 			((
 				PreRenderPass,
-				(ComposeRenderPass, ComputeRenderPass).chain().in_set(InnerRenderPass),
+				(ComputeRenderPass, ComposeRenderPass).chain().in_set(InnerRenderPass),
 				PostRenderPass,
 			)
 				.chain()
