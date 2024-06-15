@@ -1787,6 +1787,7 @@ dependencies = [
  "bevy_ecs",
  "bevy_tasks",
  "brainrot",
+ "bytemuck",
  "egui",
  "egui-wgpu",
  "egui-winit",
