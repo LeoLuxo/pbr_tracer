@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use bevy_ecs::{
 	event::{Event, Events},
 	schedule::{IntoSystemConfigs, ScheduleLabel},
-	system::{Res, ResMut, Resource},
+	system::{Res, ResMut},
 	world::World,
 };
 use brainrot::{
-	bevy::{App, Plugin},
+	bevy::{self, App, Plugin},
 	MouseMotionDelta, ScreenSize,
 };
 
@@ -124,13 +124,13 @@ impl Plugin for EventPlugin {
 	}
 }
 
-#[derive(Resource)]
+#[derive(bevy::Resource)]
 pub struct ScheduleSignal<S> {
 	counter: usize,
 	_marker: PhantomData<S>,
 }
 
-#[derive(Resource, Default)]
+#[derive(bevy::Resource, Default)]
 pub struct ClearEvents {
 	clear: bool,
 }

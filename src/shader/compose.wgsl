@@ -2,8 +2,8 @@
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f {
-	var x = -1.0 + f32((vertex_index & 1) << 2);
-	var y = -1.0 + f32((vertex_index & 2) << 1);
+	var x = -1.0 + f32((vertex_index & 1) * 2);
+	var y = -1.0 + f32(vertex_index & 2);
 
 	return vec4(x, y, 0, 1);
 }

@@ -1,13 +1,9 @@
 use std::sync::Arc;
 
-use bevy_ecs::{
-	change_detection::DetectChanges,
-	event::EventReader,
-	system::{ResMut, Resource},
-};
+use bevy_ecs::{change_detection::DetectChanges, event::EventReader, system::ResMut};
 
 use brainrot::{
-	bevy::{App, Plugin},
+	bevy::{self, App, Plugin},
 	math::Converter,
 	size, ScreenSize,
 };
@@ -65,13 +61,13 @@ impl Plugin for DisplayPlugin {
 --------------------------------------------------------------------------------
 */
 
-#[derive(Resource, Copy, Clone, Debug, Default)]
+#[derive(bevy::Resource, Copy, Clone, Debug, Default)]
 pub struct WindowSettings {
 	pub title: &'static str,
 	pub size: ScreenSize,
 } // TODO either update this on resize or delete or make immutable or something
 
-#[derive(Resource)]
+#[derive(bevy::Resource)]
 pub struct AppWindow {
 	// Window needs to be an arc so that a surface can be created from it safely
 	pub winit_window: Arc<winit::window::Window>,
@@ -79,7 +75,7 @@ pub struct AppWindow {
 	pub cursor_attached: bool,
 }
 
-#[derive(Resource)]
+#[derive(bevy::Resource)]
 pub struct Gpu {
 	pub instance: Instance,
 	pub adapter: Adapter,

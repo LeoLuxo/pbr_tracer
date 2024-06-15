@@ -424,9 +424,11 @@ dependencies = [
  "derive_more",
  "downcast-rs",
  "egui",
+ "image",
  "mint",
  "paste",
  "vek",
+ "wgpu",
  "winit",
 ]
 
@@ -455,6 +457,12 @@ dependencies = [
  "quote",
  "syn 2.0.66",
 ]
+
+[[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
@@ -1254,6 +1262,17 @@ dependencies = [
  "icu_properties",
  "smallvec",
  "utf8_iter",
+]
+
+[[package]]
+name = "image"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd54d660e773627692c524beaad361aca785a4f9f5730ce91f42aabe5bce3d11"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "num-traits",
 ]
 
 [[package]]

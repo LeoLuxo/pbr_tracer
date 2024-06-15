@@ -9,8 +9,8 @@ use crate::EventLoop;
 
 use bevy_ecs::schedule::ScheduleLabel;
 
-use bevy_ecs::{system::Resource, world::World};
-use brainrot::bevy::{App, Plugin, PluginsState};
+use bevy_ecs::world::World;
+use brainrot::bevy::{self, App, Plugin, PluginsState};
 use brainrot::math::Converter;
 use log::trace;
 use winit::event::{DeviceEvent, Event, KeyEvent, WindowEvent};
@@ -77,7 +77,7 @@ pub struct Render;
 --------------------------------------------------------------------------------
 */
 
-#[derive(Resource, Debug, Copy, Clone)]
+#[derive(bevy::Resource, Debug, Copy, Clone)]
 pub struct Time {
 	start_time: Instant,
 	pub current_time: Duration,

@@ -2,10 +2,19 @@ pub mod core;
 pub mod rendering;
 pub mod util;
 
-use core::{display::DisplayPlugin, event::EventPlugin, gameloop::GameloopPlugin};
+use core::{
+	display::DisplayPlugin,
+	event::EventPlugin,
+	gameloop::{GameloopPlugin, Render},
+};
 
+use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::bevy::App;
+use rendering::{
+	basic_render::{BasicRenderPass, BasicRendererPlugin},
+	render_target::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, WindowRenderTargetPlugin},
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -34,9 +43,10 @@ pub fn run() {
 		.add_plugin(GameloopPlugin)
 		.add_plugin(EventPlugin)
 		.add_plugin(DisplayPlugin)
+		.add_plugin(WindowRenderTargetPlugin)
 		// // Rendering plugins
+		.add_plugin(BasicRendererPlugin)
 		// .add_plugin(WindowRenderTargetPlugin)
-		// .add_plugin(TerrainRendererPlugin)
 		// .add_plugin(ChunkRendererPlugin)
 		// .add_plugin(DebugRendererPlugin)
 		// .add_plugin(DebugGuiPlugin)
@@ -44,22 +54,15 @@ pub fn run() {
 		// .add_plugin(CameraPlugin)
 		// .add_plugin(TerrainPlugin)
 		// // Configure Renderpass order
-		// .configure_sets(
-		// 	Render,
-		// 	((
-		// 		PreRenderPass,
-		// 		(
-		// 			TerrainRenderPass,
-		// 			(PreDebugRenderPass, DebugGuiRenderPass, PostDebugRenderPass)
-		// 				.chain()
-		// 				.in_set(DebugRenderPass),
-		// 		)
-		// 			.chain()
-		// 			.in_set(InnerRenderPass),
-		// 		PostRenderPass,
-		// 	)
-		// 		.chain()
-		// 		.in_set(RenderPass),),
-		// )
+		.configure_sets(
+			Render,
+			((
+				PreRenderPass,
+				(BasicRenderPass,).chain().in_set(InnerRenderPass),
+				PostRenderPass,
+			)
+				.chain()
+				.in_set(RenderPass),),
+		)
 		.run();
 }

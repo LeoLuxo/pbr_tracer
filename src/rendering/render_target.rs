@@ -2,18 +2,19 @@ use std::sync::Arc;
 
 use bevy_ecs::{
 	event::EventReader,
-	schedule::{IntoSystemConfigs, IntoSystemSetConfigs, SystemSet},
-	system::{Res, ResMut, Resource},
+	schedule::{IntoSystemConfigs, IntoSystemSetConfigs},
+	system::{Res, ResMut},
 };
 
 use brainrot::{
-	bevy::{App, Plugin},
+	bevy::{self, App, Plugin},
+	engine_3d::Texture,
 	math::Converter,
 	ScreenSize,
 };
 use wgpu::{
-	CommandBuffer, PresentMode, Surface, SurfaceCapabilities, SurfaceConfiguration, SurfaceTexture, TextureUsages,
-	TextureView, TextureViewDescriptor,
+	core::present, CommandBuffer, PresentMode, Surface, SurfaceCapabilities, SurfaceConfiguration, SurfaceTexture,
+	TextureUsages, TextureView, TextureViewDescriptor,
 };
 use winit::window::Window;
 
@@ -39,35 +40,35 @@ impl Plugin for WindowRenderTargetPlugin {
 		let app_window = app.world.resource::<AppWindow>();
 		let gpu = app.world.resource::<Gpu>();
 
-		let surface = RenderTarget::from_window(app_window.winit_window.clone(), gpu);
+		let render_target = RenderTarget::from_window(app_window.winit_window.clone(), gpu);
 
-		app.world.insert_resource(surface);
+		app.world.insert_resource(render_target);
 
 		app.add_systems(Update, resize);
 		app.add_systems(
 			Render,
 			(
-				prepare_render_pass.in_set(PreRendering),
-				finish_render_pass.in_set(PostRendering),
+				prepare_render_pass.in_set(PreRenderPass),
+				finish_render_pass.in_set(PostRenderPass),
 			)
 				.chain()
-				.in_set(Rendering),
+				.in_set(RenderPass),
 		);
-		app.configure_sets(Render, InnerRendering.run_if(is_render_pass_valid));
+		app.configure_sets(Render, InnerRenderPass.run_if(is_render_pass_valid));
 	}
 }
 
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Rendering;
+#[derive(bevy::SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RenderPass;
 
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PreRendering;
+#[derive(bevy::SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PreRenderPass;
 
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InnerRendering;
+#[derive(bevy::SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct InnerRenderPass;
 
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PostRendering;
+#[derive(bevy::SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PostRenderPass;
 
 /*
 --------------------------------------------------------------------------------
@@ -75,7 +76,7 @@ pub struct PostRendering;
 --------------------------------------------------------------------------------
 */
 
-#[derive(Resource)]
+#[derive(bevy::Resource)]
 //TODO make into a component to support multiple draw surfaces
 pub struct RenderTarget<'a> {
 	pub surface: Surface<'a>,
@@ -84,8 +85,10 @@ pub struct RenderTarget<'a> {
 	pub config: SurfaceConfiguration,
 
 	pub command_queue: Vec<CommandBuffer>,
+
 	current_texture: Option<SurfaceTexture>,
 	pub current_view: Option<TextureView>,
+	pub depth_texture: Texture,
 }
 
 impl<'a> RenderTarget<'a> {
@@ -106,20 +109,29 @@ impl<'a> RenderTarget<'a> {
 		// According to the docs, the first format is normally the preferred one
 		let surface_format = capabilities.formats[0];
 
+		let present_mode = if capabilities.present_modes.contains(&PresentMode::Mailbox) {
+			// For some reason FIFO is jittery on my desktop PC, so prioritize Mailbox
+			PresentMode::Mailbox
+		} else {
+			PresentMode::AutoNoVsync
+		};
+
 		// Configure the surface
 		let config = SurfaceConfiguration {
 			usage: TextureUsages::RENDER_ATTACHMENT,
 			format: surface_format,
 			width: size.w,
 			height: size.h,
-			// For some reason FIFO is jittery on my PC
-			present_mode: PresentMode::Mailbox,
+			present_mode,
 			desired_maximum_frame_latency: 2,
 			alpha_mode: capabilities.alpha_modes[0],
 			view_formats: vec![],
 		};
 
 		surface.configure(&gpu.device, &config);
+
+		// In wgpu, the depth buffer has to be explicitly created
+		let depth_texture = Texture::create_depth_texture(&gpu.device, size, Some("Depth texture"));
 
 		Self {
 			surface,
@@ -129,6 +141,7 @@ impl<'a> RenderTarget<'a> {
 			command_queue: vec![],
 			current_texture: None,
 			current_view: None,
+			depth_texture,
 		}
 	}
 }
@@ -179,5 +192,6 @@ fn resize(
 		render_target.config.width = size.w;
 		render_target.config.height = size.h;
 		render_target.surface.configure(&gpu.device, &render_target.config);
+		render_target.depth_texture = Texture::create_depth_texture(&gpu.device, size, Some("Depth Texture"));
 	}
 }
