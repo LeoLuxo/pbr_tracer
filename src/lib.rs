@@ -1,10 +1,10 @@
 pub mod core;
 pub mod rendering;
-pub mod util;
 
 use core::{
 	display::DisplayPlugin,
-	event::EventPlugin,
+	event_processing::EventProcessingPlugin,
+	events::EventsPlugin,
 	gameloop::{GameloopPlugin, Render},
 	render_target::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, WindowRenderTargetPlugin},
 };
@@ -38,8 +38,9 @@ pub fn run() {
 
 	App::new()
 		// Core plugins
+		.add_plugin(EventProcessingPlugin)
+		.add_plugin(EventsPlugin)
 		.add_plugin(GameloopPlugin)
-		.add_plugin(EventPlugin)
 		.add_plugin(DisplayPlugin)
 		.add_plugin(WindowRenderTargetPlugin)
 		// // Rendering plugins

@@ -19,10 +19,10 @@ use winit::{
 
 use crate::{
 	core::{
-		event::{KeyboardInputEvent, WinitWindowEvent},
+		event_processing::{EventReaderProcessor, ProcessedInputEvents},
+		events::{KeyboardInputEvent, WinitWindowEvent},
 		gameloop::Update,
 	},
-	util::event_processing::{EventReaderProcessor, ProcessedInputEvents},
 	EventLoop,
 };
 

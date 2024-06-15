@@ -14,7 +14,7 @@ use winit::event::{DeviceEvent, Event, KeyEvent, WindowEvent};
 use crate::{
 	core::{
 		display::AppWindow,
-		event::{
+		events::{
 			KeyboardInputEvent, MouseInputEvent, MouseMotionEvent, MouseWheelEvent, WindowResizedEvent,
 			WinitWindowEvent,
 		},

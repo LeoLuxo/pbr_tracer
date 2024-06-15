@@ -16,13 +16,11 @@ use wgpu::{
 };
 use winit::window::Window;
 
-use crate::{
-	core::{
-		display::{AppWindow, Gpu},
-		event::WindowResizedEvent,
-		gameloop::{Render, Update},
-	},
-	util::event_processing::{EventReaderProcessor, ProcessedChangeEvents},
+use super::event_processing::{EventReaderProcessor, ProcessedChangeEvents};
+use crate::core::{
+	display::{AppWindow, Gpu},
+	events::WindowResizedEvent,
+	gameloop::{Render, Update},
 };
 
 /*
