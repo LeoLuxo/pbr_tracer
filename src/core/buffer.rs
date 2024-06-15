@@ -1,7 +1,10 @@
 use std::{marker::PhantomData, mem};
 
-use bevy_ecs::system::{Query, Res};
-use brainrot::bevy::{self, App};
+use bevy_ecs::{
+	bundle::Bundle,
+	system::{Query, Res},
+};
+use brainrot::bevy::{self, App, Component};
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
 	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, Device, Queue, ShaderStages,
@@ -20,7 +23,6 @@ pub struct UniformBuffer<T>
 where
 	T: Sized + bytemuck::Pod,
 {
-	pub uniform: T,
 	pub buffer: Buffer,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
@@ -31,7 +33,7 @@ impl<T> UniformBuffer<T>
 where
 	T: Sized + bytemuck::Pod,
 {
-	pub fn new(uniform: T, device: &Device, name: &str, visibility: ShaderStages) -> Self {
+	pub fn new(device: &Device, name: &str, visibility: ShaderStages) -> Self {
 		// Create a uniform buffer for data in T
 		// In wgpu, uniforms need to be explicitly created as buffers
 		let buffer = device.create_buffer(&BufferDescriptor {
@@ -65,16 +67,11 @@ where
 		});
 
 		UniformBuffer::<T> {
-			uniform,
 			buffer,
 			bind_group_layout,
 			bind_group,
 			_marker: Default::default(),
 		}
-	}
-
-	pub fn update(&self, queue: &Queue) {
-		queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&self.uniform));
 	}
 }
 
@@ -84,18 +81,19 @@ where
 --------------------------------------------------------------------------------
 */
 
-pub fn register_buffer<T>(app: &mut App)
+pub fn register_uniform<T>(app: &mut App)
 where
-	T: bytemuck::Pod + Send + Sync,
+	T: bytemuck::Pod + bevy::Component + Send + Sync,
 {
 	app.add_systems(PreRender, upload_buffers::<T>);
 }
 
-fn upload_buffers<T>(gpu: Res<Gpu>, q: Query<&UniformBuffer<T>>)
+fn upload_buffers<T>(gpu: Res<Gpu>, q: Query<(&T, &UniformBuffer<T>)>)
 where
-	T: bytemuck::Pod + Send + Sync,
+	T: bytemuck::Pod + bevy::Component + Send + Sync,
 {
-	for uniform_buffer in q.iter() {
-		uniform_buffer.update(&gpu.queue);
+	for (uniform, uniform_buffer) in q.iter() {
+		gpu.queue
+			.write_buffer(&uniform_buffer.buffer, 0, bytemuck::bytes_of(uniform));
 	}
 }

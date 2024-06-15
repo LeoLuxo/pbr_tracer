@@ -1,19 +1,27 @@
 use bevy_ecs::{
+	event::EventReader,
 	schedule::IntoSystemConfigs,
-	system::{Res, ResMut},
+	system::{Query, Res, ResMut},
 };
 use brainrot::{
-	bevy,
-	bevy::{App, Plugin},
-	src,
+	bevy::{self, App, Plugin},
+	src, ScreenSize,
 };
 use wgpu::{
-	include_wgsl, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState, FrontFace,
-	LoadOp, MultisampleState, Operations, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
-	RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, StoreOp, VertexState,
+	include_wgsl, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor,
+	FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayout, PipelineLayoutDescriptor,
+	PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+	RenderPipelineDescriptor, ShaderStages, StoreOp, VertexState,
 };
 
-use crate::core::{display::Gpu, gameloop::Render, render_target::RenderTarget};
+use crate::core::{
+	buffer::{self, UniformBuffer},
+	display::Gpu,
+	event_processing::{EventReaderProcessor, ProcessedChangeEvents},
+	events::WindowResizedEvent,
+	gameloop::{Render, Update},
+	render_target::RenderTarget,
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -28,10 +36,21 @@ impl Plugin for ComposeRendererPlugin {
 		let gpu = app.world.resource::<Gpu>();
 		let render_target = app.world.resource::<RenderTarget>();
 
-		let compose_renderer = ComposeRenderer::new(gpu, render_target);
+		let viewport_buffer = (
+			ViewportInfo {
+				size: render_target.size,
+			},
+			UniformBuffer::<ViewportInfo>::new(&gpu.device, "viewport", ShaderStages::FRAGMENT),
+		);
+
+		let compose_renderer = ComposeRenderer::new(gpu, render_target, vec![&viewport_buffer.1.bind_group_layout]);
+
+		buffer::register_uniform::<ViewportInfo>(app);
+		app.world.spawn(viewport_buffer);
 
 		app.world.insert_resource(compose_renderer);
 
+		app.add_systems(Update, resize);
 		app.add_systems(Render, (render).in_set(ComposeRenderPass).chain());
 	}
 }
@@ -45,22 +64,35 @@ pub struct ComposeRenderPass;
 --------------------------------------------------------------------------------
 */
 
+#[repr(C)]
+#[derive(bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug)]
+pub struct ViewportInfo {
+	pub size: ScreenSize,
+}
+
 #[derive(bevy::Resource)]
 pub struct ComposeRenderer {
 	pipeline: RenderPipeline,
 }
 
 impl ComposeRenderer {
-	pub fn new(gpu: &Gpu, render_target: &RenderTarget) -> Self {
+	pub fn new(gpu: &Gpu, render_target: &RenderTarget, layouts: Vec<&BindGroupLayout>) -> Self {
 		// Statically include the shader in the executable
 		let shader = gpu
 			.device
 			.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
 
+		// Contains the bind group layouts that are needed in the pipeline
+		let render_pipeline_layout = gpu.device.create_pipeline_layout(&PipelineLayoutDescriptor {
+			label: Some("Render Pipeline Layout"),
+			bind_group_layouts: &layouts,
+			push_constant_ranges: &[],
+		});
+
 		// Create the render pipeline. Specify shader stages, primitive type, stencil/depth information, and some more stuff.
 		let pipeline = gpu.device.create_render_pipeline(&RenderPipelineDescriptor {
 			label: Some("Basic Render Pipeline"),
-			layout: None,
+			layout: Some(&render_pipeline_layout),
 			// No vertex buffers, we'll render 2 fullscreen triangles
 			// and set their positions in the shader
 			vertex: VertexState {
@@ -110,7 +142,20 @@ impl ComposeRenderer {
 --------------------------------------------------------------------------------
 */
 
-fn render(compose_renderer: Res<ComposeRenderer>, mut render_target: ResMut<RenderTarget<'static>>, gpu: Res<Gpu>) {
+fn resize(window_events: EventReader<WindowResizedEvent>, mut q: Query<&mut ViewportInfo>) {
+	if let Some(size) = window_events.process().latest() {
+		for mut viewport_info in q.iter_mut() {
+			viewport_info.size = size;
+		}
+	}
+}
+
+fn render(
+	compose_renderer: Res<ComposeRenderer>,
+	mut render_target: ResMut<RenderTarget<'static>>,
+	gpu: Res<Gpu>,
+	q: Query<&UniformBuffer<ViewportInfo>>,
+) {
 	// trace!("Rendering terrain");
 
 	// A command encoder takes multiple draw/compute commands that can then be encoded into a command buffer to be submitted to the queue
@@ -146,6 +191,8 @@ fn render(compose_renderer: Res<ComposeRenderer>, mut render_target: ResMut<Rend
 		});
 
 		render_pass.set_pipeline(&compose_renderer.pipeline);
+
+		render_pass.set_bind_group(0, &q.single().bind_group, &[]);
 
 		// Draw 2 fullscreen triangles
 		// 1 -- 2
