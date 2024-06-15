@@ -1,9 +1,15 @@
 use bevy_ecs::{schedule::IntoSystemConfigs, system::Res};
 use brainrot::{
 	bevy::{self, App, Plugin},
+	engine_3d::TextureAsset,
 	src,
+	vek::Extent2,
 };
-use wgpu::{include_wgsl, CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor};
+use wgpu::{
+	include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
+	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
+};
 
 use crate::core::{display::Gpu, gameloop::Render};
 
@@ -39,6 +45,7 @@ pub struct ComputeRenderPass;
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
+	output_texture: TextureAsset,
 }
 
 impl ComputeRenderer {
@@ -48,14 +55,46 @@ impl ComputeRenderer {
 			.device
 			.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
 
+		// The output texture that the compute will write to
+		let output_texture = TextureAsset::create_storage_texture(
+			&gpu.device,
+			(20, 10).into(),
+			FilterMode::Nearest,
+			TextureFormat::Rgba32Float,
+			Some("Output texture"),
+		);
+
+		let bind_group_layout = gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+			label: Some("Compute Bind Group Layout"),
+			entries: &[BindGroupLayoutEntry {
+				binding: 0,
+				visibility: ShaderStages::COMPUTE,
+				ty: BindingType::StorageTexture {
+					access: StorageTextureAccess::ReadWrite,
+					format: output_texture.texture.format(),
+					view_dimension: TextureViewDimension::D2,
+				},
+				count: None,
+			}],
+		});
+
+		let pipeline_layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+			label: Some("Compute Pipeline Layout"),
+			bind_group_layouts: &[&bind_group_layout],
+			push_constant_ranges: &[],
+		});
+
 		let pipeline = gpu.device.create_compute_pipeline(&ComputePipelineDescriptor {
 			label: Some("Compute pipeline"),
-			layout: None,
+			layout: Some(&pipeline_layout),
 			module: &shader,
 			entry_point: "main",
 		});
 
-		Self { pipeline }
+		Self {
+			pipeline,
+			output_texture,
+		}
 	}
 }
 
@@ -70,6 +109,18 @@ fn render(compute_renderer: Res<ComputeRenderer>, gpu: Res<Gpu>) {
 		label: Some("ComputeRenderer Command Encoder"),
 	});
 
+	let compute_bind_group = gpu.device.create_bind_group(&BindGroupDescriptor {
+		label: Some("ComputeRenderer Bind Group"),
+		layout: &compute_renderer.pipeline.get_bind_group_layout(0),
+		entries: &[BindGroupEntry {
+			binding: 0,
+			resource: wgpu::BindingResource::TextureView(&compute_renderer.output_texture.view),
+		}],
+	});
+
+	let out_width = compute_renderer.output_texture.texture.width();
+	let out_height = compute_renderer.output_texture.texture.height();
+
 	{
 		let mut compute_pass = command_encoder.begin_compute_pass(&ComputePassDescriptor {
 			label: Some("ComputeRenderer Compute Pass"),
@@ -77,6 +128,9 @@ fn render(compute_renderer: Res<ComputeRenderer>, gpu: Res<Gpu>) {
 		});
 
 		compute_pass.set_pipeline(&compute_renderer.pipeline);
-		compute_pass.dispatch_workgroups(100, 100, 1);
+
+		compute_pass.set_bind_group(0, &compute_bind_group, &[]);
+
+		compute_pass.dispatch_workgroups(out_width, out_height, 1);
 	}
 }

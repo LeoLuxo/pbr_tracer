@@ -150,9 +150,10 @@ impl Gpu {
 			.request_device(
 				&(DeviceDescriptor {
 					required_features: Features::empty()
-						| Features::TEXTURE_BINDING_ARRAY
-						| Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
-						| Features::CONSERVATIVE_RASTERIZATION,
+						// | Features::TEXTURE_BINDING_ARRAY
+						// | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
+						| Features::CONSERVATIVE_RASTERIZATION
+						| Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
 					required_limits: Limits::default(),
 					label: None,
 				}),
