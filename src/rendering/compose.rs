@@ -7,11 +7,14 @@ use brainrot::{
 	bevy::{self, App, Plugin},
 	src, ScreenSize,
 };
+use velcro::vec;
 use wgpu::{
-	include_wgsl, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor,
-	FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode,
-	PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-	RenderPipelineDescriptor, ShaderStages, StoreOp, VertexState,
+	include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+	BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Color, ColorTargetState, ColorWrites,
+	CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor,
+	PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+	RenderPipelineDescriptor, SamplerBindingType, ShaderStages, StoreOp, TextureSampleType, TextureViewDimension,
+	VertexState,
 };
 
 use crate::core::{
@@ -22,6 +25,8 @@ use crate::core::{
 	gameloop::{Render, Update},
 	render_target::RenderTarget,
 };
+
+use super::compute::ComputeRenderer;
 
 /*
 --------------------------------------------------------------------------------
@@ -35,6 +40,7 @@ impl Plugin for ComposeRendererPlugin {
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 		let render_target = app.world.resource::<RenderTarget>();
+		let computer_renderer = app.world.resource::<ComputeRenderer>();
 
 		let viewport_buffer = (
 			ViewportInfo {
@@ -43,7 +49,12 @@ impl Plugin for ComposeRendererPlugin {
 			UniformBuffer::<ViewportInfo>::new(&gpu.device, "viewport", ShaderStages::FRAGMENT),
 		);
 
-		let compose_renderer = ComposeRenderer::new(gpu, render_target, vec![&viewport_buffer.1.bind_group_layout]);
+		let compose_renderer = ComposeRenderer::new(
+			gpu,
+			render_target,
+			computer_renderer,
+			vec![&viewport_buffer.1.bind_group_layout],
+		);
 
 		buffer::register_uniform::<ViewportInfo>(app);
 		app.world.spawn(viewport_buffer);
@@ -73,19 +84,70 @@ pub struct ViewportInfo {
 #[derive(bevy::Resource)]
 pub struct ComposeRenderer {
 	pipeline: RenderPipeline,
+	texture_bind_group: BindGroup,
 }
 
 impl ComposeRenderer {
-	pub fn new(gpu: &Gpu, render_target: &RenderTarget, layouts: Vec<&BindGroupLayout>) -> Self {
+	pub fn new(
+		gpu: &Gpu,
+		render_target: &RenderTarget,
+		compute_renderer: &ComputeRenderer,
+		additional_layouts: Vec<&BindGroupLayout>,
+	) -> Self {
 		// Statically include the shader in the executable
 		let shader = gpu
 			.device
 			.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
 
+		// Textures and buffers need both a bind group *layout* and a bind group.
+		// The bind group layout describes the layout of the data.
+		let texture_bind_group_layout = &gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+			entries: &[
+				BindGroupLayoutEntry {
+					binding: 0,
+					visibility: ShaderStages::FRAGMENT,
+					ty: BindingType::Texture {
+						multisampled: false,
+						view_dimension: TextureViewDimension::D2,
+						sample_type: TextureSampleType::Float { filterable: true },
+					},
+					count: None,
+				},
+				BindGroupLayoutEntry {
+					binding: 1,
+					visibility: ShaderStages::FRAGMENT,
+					// This should match the filterable field of the
+					// corresponding Texture entry above.
+					ty: BindingType::Sampler(SamplerBindingType::Filtering),
+					count: None,
+				},
+			],
+			label: Some("Compose bind group layout"),
+		});
+
+		// The bind group actually maps the shader variables to the data on the GPU memory.
+		// Multiple bind groups can be interchanged as long as they have the same bind group layout.
+		let texture_bind_group = gpu.device.create_bind_group(&BindGroupDescriptor {
+			layout: texture_bind_group_layout,
+			entries: &[
+				BindGroupEntry {
+					binding: 0,
+					resource: BindingResource::TextureView(&compute_renderer.output_texture.view),
+				},
+				BindGroupEntry {
+					binding: 1,
+					resource: BindingResource::Sampler(&compute_renderer.output_texture.sampler),
+				},
+			],
+			label: Some("Compose bind group"),
+		});
+
+		let bind_group_layouts = &vec![texture_bind_group_layout, ..additional_layouts];
+
 		// Contains the bind group layouts that are needed in the pipeline
 		let render_pipeline_layout = gpu.device.create_pipeline_layout(&PipelineLayoutDescriptor {
 			label: Some("Render Pipeline Layout"),
-			bind_group_layouts: &layouts,
+			bind_group_layouts,
 			push_constant_ranges: &[],
 		});
 
@@ -132,7 +194,10 @@ impl ComposeRenderer {
 			multiview: None,
 		});
 
-		Self { pipeline }
+		Self {
+			pipeline,
+			texture_bind_group,
+		}
 	}
 }
 
@@ -192,7 +257,8 @@ fn render(
 
 		render_pass.set_pipeline(&compose_renderer.pipeline);
 
-		render_pass.set_bind_group(0, &q.single().bind_group, &[]);
+		render_pass.set_bind_group(0, &compose_renderer.texture_bind_group, &[]);
+		render_pass.set_bind_group(1, &q.single().bind_group, &[]);
 
 		// Draw 2 fullscreen triangles
 		// 1 -- 2

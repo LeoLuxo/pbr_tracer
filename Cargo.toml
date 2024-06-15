@@ -22,3 +22,4 @@ bytemuck   = { version = "1.15.0", features = ["derive", "min_const_generics"] }
 env_logger = "0.11"
 log        = "0.4"
 pollster   = "0.3.0"
+velcro     = "0.5.4"

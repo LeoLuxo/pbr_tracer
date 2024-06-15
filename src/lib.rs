@@ -49,8 +49,8 @@ pub fn run() {
 		.add_plugin(WindowRenderTargetPlugin)
 		// Rendering plugins
 		.add_plugin(RenderPlugin)
-		.add_plugin(ComposeRendererPlugin)
 		.add_plugin(ComputeRendererPlugin)
+		.add_plugin(ComposeRendererPlugin)
 		// Configure Renderpass order
 		.configure_sets(
 			Render,

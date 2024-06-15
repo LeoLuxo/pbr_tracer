@@ -153,7 +153,8 @@ impl Gpu {
 						// | Features::TEXTURE_BINDING_ARRAY
 						// | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
 						| Features::CONSERVATIVE_RASTERIZATION
-						| Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
+						| Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+						| Features::FLOAT32_FILTERABLE,
 					required_limits: Limits::default(),
 					label: None,
 				}),

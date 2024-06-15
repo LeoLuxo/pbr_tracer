@@ -45,7 +45,7 @@ pub struct ComputeRenderPass;
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
-	output_texture: TextureAsset,
+	pub output_texture: TextureAsset,
 }
 
 impl ComputeRenderer {
@@ -56,7 +56,7 @@ impl ComputeRenderer {
 			.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
 
 		// The output texture that the compute will write to
-		let output_texture = TextureAsset::create_storage_texture(
+		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
 			(20, 10).into(),
 			FilterMode::Nearest,
