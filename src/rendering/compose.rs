@@ -22,23 +22,23 @@ use super::render_target::RenderTarget;
 --------------------------------------------------------------------------------
 */
 
-pub struct BasicRendererPlugin;
+pub struct ComposeRendererPlugin;
 
-impl Plugin for BasicRendererPlugin {
+impl Plugin for ComposeRendererPlugin {
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 		let render_target = app.world.resource::<RenderTarget>();
 
-		let basic_renderer = BasicRenderer::new(gpu, render_target);
+		let compose_renderer = ComposeRenderer::new(gpu, render_target);
 
-		app.world.insert_resource(basic_renderer);
+		app.world.insert_resource(compose_renderer);
 
-		app.add_systems(Render, (render).in_set(BasicRenderPass).chain());
+		app.add_systems(Render, (render).in_set(ComposeRenderPass).chain());
 	}
 }
 
 #[derive(bevy::SystemSet, Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct BasicRenderPass;
+pub struct ComposeRenderPass;
 
 /*
 --------------------------------------------------------------------------------
@@ -47,11 +47,11 @@ pub struct BasicRenderPass;
 */
 
 #[derive(bevy::Resource)]
-pub struct BasicRenderer {
+pub struct ComposeRenderer {
 	render_pipeline: RenderPipeline,
 }
 
-impl BasicRenderer {
+impl ComposeRenderer {
 	pub fn new(gpu: &Gpu, render_target: &RenderTarget) -> Self {
 		// Statically include the shader in the executable
 		let shader = gpu
@@ -126,12 +126,12 @@ impl BasicRenderer {
 --------------------------------------------------------------------------------
 */
 
-fn render(basic_renderer: Res<BasicRenderer>, mut render_target: ResMut<RenderTarget<'static>>, gpu: Res<Gpu>) {
+fn render(compose_renderer: Res<ComposeRenderer>, mut render_target: ResMut<RenderTarget<'static>>, gpu: Res<Gpu>) {
 	// trace!("Rendering terrain");
 
 	// A command encoder takes multiple draw/compute commands that can then be encoded into a command buffer to be submitted to the queue
 	let mut encoder = gpu.device.create_command_encoder(&CommandEncoderDescriptor {
-		label: Some("BasicRenderer Command Encoder"),
+		label: Some("ComposeRenderer Command Encoder"),
 	});
 
 	{
@@ -168,7 +168,7 @@ fn render(basic_renderer: Res<BasicRenderer>, mut render_target: ResMut<RenderTa
 			timestamp_writes: None,
 		});
 
-		render_pass.set_pipeline(&basic_renderer.render_pipeline);
+		render_pass.set_pipeline(&compose_renderer.render_pipeline);
 
 		// Draw 2 fullscreen triangles
 		// 1 -- 2

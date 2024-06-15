@@ -12,7 +12,7 @@ use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::bevy::App;
 use rendering::{
-	basic_render::{BasicRenderPass, BasicRendererPlugin},
+	compose::{ComposeRenderPass, ComposeRendererPlugin},
 	render_target::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, WindowRenderTargetPlugin},
 };
 
@@ -45,7 +45,7 @@ pub fn run() {
 		.add_plugin(DisplayPlugin)
 		.add_plugin(WindowRenderTargetPlugin)
 		// // Rendering plugins
-		.add_plugin(BasicRendererPlugin)
+		.add_plugin(ComposeRendererPlugin)
 		// .add_plugin(WindowRenderTargetPlugin)
 		// .add_plugin(ChunkRendererPlugin)
 		// .add_plugin(DebugRendererPlugin)
@@ -58,7 +58,7 @@ pub fn run() {
 			Render,
 			((
 				PreRenderPass,
-				(BasicRenderPass,).chain().in_set(InnerRenderPass),
+				(ComposeRenderPass,).chain().in_set(InnerRenderPass),
 				PostRenderPass,
 			)
 				.chain()

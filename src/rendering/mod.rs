@@ -1,2 +1,2 @@
-pub mod basic_render;
+pub mod compose;
 pub mod render_target;
