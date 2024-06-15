@@ -13,7 +13,7 @@ use brainrot::{
 	ScreenSize,
 };
 use wgpu::{
-	core::present, CommandBuffer, PresentMode, Surface, SurfaceCapabilities, SurfaceConfiguration, SurfaceTexture,
+	CommandBuffer, PresentMode, Surface, SurfaceCapabilities, SurfaceConfiguration, SurfaceTexture,
 	TextureUsages, TextureView, TextureViewDescriptor,
 };
 use winit::window::Window;

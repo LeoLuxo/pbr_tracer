@@ -5,7 +5,7 @@ use brainrot::engine_3d::Texture;
 use brainrot::{bevy, src};
 use wgpu::{
 	include_wgsl, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, CompareFunction,
-	DepthBiasState, DepthStencilState, Face, FragmentState, FrontFace, LoadOp, MultisampleState, Operations,
+	DepthBiasState, DepthStencilState, FragmentState, FrontFace, LoadOp, MultisampleState, Operations,
 	PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment,
 	RenderPassDepthStencilAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, StencilState,
 	StoreOp, VertexState,
@@ -94,7 +94,7 @@ impl BasicRenderer {
 					topology: PrimitiveTopology::TriangleStrip,
 					strip_index_format: None,
 					front_face: FrontFace::Cw,
-					cull_mode: Some(Face::Back),
+					cull_mode: None,
 					polygon_mode: PolygonMode::Fill,
 					unclipped_depth: false,
 					conservative: true,
