@@ -1,13 +1,10 @@
 use std::{marker::PhantomData, mem};
 
-use bevy_ecs::{
-	bundle::Bundle,
-	system::{Query, Res},
-};
-use brainrot::bevy::{self, App, Component};
+use bevy_ecs::system::{Query, Res};
+use brainrot::bevy::{self, App};
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, Device, Queue, ShaderStages,
+	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, Device, ShaderStages,
 };
 
 use super::{display::Gpu, gameloop::PreRender};

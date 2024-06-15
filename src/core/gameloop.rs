@@ -236,7 +236,7 @@ fn start_event_loop(world: &mut World) {
 					world.send_event(event_out);
 				}
 
-				WindowEvent::Resized(physical_size) => {
+				WindowEvent::Resized(physical_size) if physical_size.width > 0 && physical_size.height > 0 => {
 					let event_out = WindowResizedEvent {
 						size: physical_size.convert(),
 					};

@@ -9,8 +9,8 @@ use brainrot::{
 };
 use wgpu::{
 	include_wgsl, BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor,
-	FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayout, PipelineLayoutDescriptor,
-	PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+	FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode,
+	PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
 	RenderPipelineDescriptor, ShaderStages, StoreOp, VertexState,
 };
 
