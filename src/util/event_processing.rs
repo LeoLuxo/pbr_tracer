@@ -2,14 +2,13 @@ use std::slice::Iter;
 
 use bevy_ecs::event::{Event, EventReader};
 use brainrot::{vec2, MouseMotionDelta, ScreenSize};
+use event::{KeyboardInputEvent, MouseInputEvent, MouseMotionEvent, WindowResizedEvent};
 use winit::{
 	event::{ElementState, MouseButton},
 	keyboard::{KeyCode, PhysicalKey},
 };
 
 use crate::core::event;
-
-use event::{KeyboardInputEvent, MouseInputEvent, MouseMotionEvent, WindowResizedEvent};
 
 /*
 --------------------------------------------------------------------------------

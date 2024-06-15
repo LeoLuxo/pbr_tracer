@@ -1,8 +1,13 @@
-use bevy_ecs::schedule::IntoSystemConfigs;
-use bevy_ecs::system::{Res, ResMut};
-use brainrot::bevy::{App, Plugin};
-use brainrot::engine_3d::TextureAsset;
-use brainrot::{bevy, src};
+use bevy_ecs::{
+	schedule::IntoSystemConfigs,
+	system::{Res, ResMut},
+};
+use brainrot::{
+	bevy,
+	bevy::{App, Plugin},
+	engine_3d::TextureAsset,
+	src,
+};
 use wgpu::{
 	include_wgsl, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, CompareFunction,
 	DepthBiasState, DepthStencilState, FragmentState, FrontFace, LoadOp, MultisampleState, Operations,
@@ -11,10 +16,7 @@ use wgpu::{
 	StoreOp, VertexState,
 };
 
-use crate::core::display::Gpu;
-use crate::core::gameloop::Render;
-
-use super::render_target::RenderTarget;
+use crate::core::{display::Gpu, gameloop::Render, render_target::RenderTarget};
 
 /*
 --------------------------------------------------------------------------------

@@ -1,19 +1,26 @@
-use std::cmp::min;
-use std::time::{Duration, Instant};
-
-use crate::core::display::AppWindow;
-use crate::core::event::{
-	KeyboardInputEvent, MouseInputEvent, MouseMotionEvent, MouseWheelEvent, WindowResizedEvent, WinitWindowEvent,
+use std::{
+	cmp::min,
+	time::{Duration, Instant},
 };
-use crate::EventLoop;
 
-use bevy_ecs::schedule::ScheduleLabel;
-
-use bevy_ecs::world::World;
-use brainrot::bevy::{self, App, Plugin, PluginsState};
-use brainrot::math::Converter;
+use bevy_ecs::{schedule::ScheduleLabel, world::World};
+use brainrot::{
+	bevy::{self, App, Plugin, PluginsState},
+	math::Converter,
+};
 use log::trace;
 use winit::event::{DeviceEvent, Event, KeyEvent, WindowEvent};
+
+use crate::{
+	core::{
+		display::AppWindow,
+		event::{
+			KeyboardInputEvent, MouseInputEvent, MouseMotionEvent, MouseWheelEvent, WindowResizedEvent,
+			WinitWindowEvent,
+		},
+	},
+	EventLoop,
+};
 
 /*
 --------------------------------------------------------------------------------

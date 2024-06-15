@@ -5,7 +5,6 @@ use bevy_ecs::{
 	schedule::{IntoSystemConfigs, IntoSystemSetConfigs},
 	system::{Res, ResMut},
 };
-
 use brainrot::{
 	bevy::{self, App, Plugin},
 	engine_3d::TextureAsset,
@@ -76,8 +75,9 @@ pub struct PostRenderPass;
 --------------------------------------------------------------------------------
 */
 
+//TODO make RenderTarget into a component (or other) to support multiple draw surfaces, and separate render into its own file under /rendering/
+
 #[derive(bevy::Resource)]
-//TODO make into a component to support multiple draw surfaces
 pub struct RenderTarget<'a> {
 	pub surface: Surface<'a>,
 	pub size: ScreenSize,

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use bevy_ecs::{change_detection::DetectChanges, event::EventReader, system::ResMut};
-
 use brainrot::{
 	bevy::{self, App, Plugin},
 	math::Converter,
@@ -23,9 +22,9 @@ use crate::{
 		event::{KeyboardInputEvent, WinitWindowEvent},
 		gameloop::Update,
 	},
-	util::event_processing::EventReaderProcessor,
+	util::event_processing::{EventReaderProcessor, ProcessedInputEvents},
+	EventLoop,
 };
-use crate::{util::event_processing::ProcessedInputEvents, EventLoop};
 
 /*
 --------------------------------------------------------------------------------

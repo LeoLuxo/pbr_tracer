@@ -6,15 +6,13 @@ use core::{
 	display::DisplayPlugin,
 	event::EventPlugin,
 	gameloop::{GameloopPlugin, Render},
+	render_target::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, WindowRenderTargetPlugin},
 };
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::bevy::App;
-use rendering::{
-	compose::{ComposeRenderPass, ComposeRendererPlugin},
-	render_target::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, WindowRenderTargetPlugin},
-};
+use rendering::compose::{ComposeRenderPass, ComposeRendererPlugin};
 
 /*
 --------------------------------------------------------------------------------
