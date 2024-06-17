@@ -3,7 +3,7 @@
 @group(0) @binding(1) var out_sampler: sampler;
 
 @group(1) @binding(0) var<uniform> viewport_size: vec2u;
-#include "fuck/poopoo.wgsl"
+#include "/fuck/poopoo.wgsl"
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f {
 	var x = -1.0 + f32((vertex_index & 1) * 2);

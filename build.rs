@@ -48,7 +48,6 @@ fn main() {
 
 	let out_path = path!(&env::var("OUT_DIR").unwrap()).join(destination);
 	let out_file = File::create(native_pathbuf!(out_path).unwrap()).unwrap();
-	println!("cargo::warning={:?}", out_file);
 	let mut out_writer = BufWriter::new(out_file);
 
 	write!(&mut out_writer, "{}", map.build()).unwrap();
