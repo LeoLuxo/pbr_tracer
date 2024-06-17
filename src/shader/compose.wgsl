@@ -4,6 +4,7 @@
 
 @group(1) @binding(0) var<uniform> viewport_size: vec2u;
 
+#include "fuck/poopoo.wgsl"
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f {

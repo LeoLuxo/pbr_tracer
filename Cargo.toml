@@ -5,6 +5,13 @@ rust-version = "1.79"
 version      = "0.1.0"
 
 
+[build-dependencies]
+brainrot    = { path = "../brainrot", features = ["macros", "shader"] }
+glob        = "0.3.1"
+phf         = { version = "0.11.2", default-features = false }
+phf_codegen = "0.11.2"
+
+
 [dependencies]
 brainrot = { path = "../brainrot", features = ["bevy", "convert", "macros", "shader", "texture", "vek"] }
 
@@ -22,6 +29,6 @@ bytemuck    = { version = "1.15.0", features = ["derive", "min_const_generics"] 
 env_logger  = "0.11"
 include_dir = "0.7.3"
 log         = "0.4"
+once_cell   = "1.19.0"
 pollster    = "0.3.0"
 velcro      = "0.5.4"
-once_cell = "1.19.0"

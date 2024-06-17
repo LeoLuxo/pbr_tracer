@@ -6,14 +6,14 @@ use bevy_ecs::{
 use brainrot::{
 	bevy::{self, App, Plugin},
 	engine_3d::ShaderBuilder,
-	shader, src, ScreenSize,
+	ScreenSize,
 };
 use velcro::vec;
 use wgpu::{
-	include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-	BindGroupLayoutEntry, BindingResource, BindingType, BlendState, Color, ColorTargetState, ColorWrites,
-	CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor,
-	PolygonMode, PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
+	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+	BindingResource, BindingType, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor,
+	FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode,
+	PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
 	RenderPipelineDescriptor, SamplerBindingType, ShaderStages, StoreOp, TextureSampleType, TextureViewDimension,
 	VertexState,
 };
@@ -28,7 +28,7 @@ use crate::{
 		gameloop::{Render, Update},
 		render_target::RenderTarget,
 	},
-	SHADER_FILES,
+	SHADER_DIR,
 };
 
 /*
@@ -101,9 +101,9 @@ impl ComposeRenderer {
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
-		let shader = ShaderBuilder::new()
-			.include(shader!("shader/compose.wgsl"))
-			.build(&gpu.device, &SHADER_FILES)
+		let shader = ShaderBuilder::new(&SHADER_DIR)
+			.include("compose.wgsl")
+			.build(&gpu.device)
 			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.

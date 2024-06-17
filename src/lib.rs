@@ -11,31 +11,20 @@ use core::{
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::{bevy::App, engine_3d::ShaderFile};
-use once_cell::sync::Lazy;
+use brainrot::{bevy::App, engine_3d::ShaderDir};
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
 	compute::{ComputeRenderPass, ComputeRendererPlugin},
 	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
 };
 
-use include_dir::{include_dir, Dir};
 /*
 --------------------------------------------------------------------------------
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
 
-static SHADER_FILES: Lazy<Vec<ShaderFile>> = Lazy::new(|| {
-	static DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/shader");
-
-	DIR.files()
-		.map(|f| ShaderFile {
-			file_name: f.path().to_str().unwrap(),
-			shader_source: f.contents_utf8().unwrap(),
-		})
-		.collect()
-});
+static SHADER_DIR: ShaderDir = include!(concat!(env!("OUT_DIR"), "/shader_dir.rs"));
 
 pub trait EntityLabel {}
 
