@@ -6,11 +6,7 @@ version      = "0.1.0"
 
 
 [build-dependencies]
-brainrot    = { path = "../brainrot", features = ["shader"] }
-glob        = "0.3.1"
-phf         = { version = "0.11.2", default-features = false }
-phf_codegen = "0.11.2"
-typed-path  = "0.9.0"
+brainrot = { path = "../brainrot", features = ["shader"] }
 
 
 [dependencies]
@@ -19,16 +15,15 @@ brainrot = { path = "../brainrot", features = ["bevy", "convert", "shader", "tex
 bevy_ecs   = "=0.13.2"
 bevy_tasks = { version = "=0.13.2", features = ["multi-threaded"] }
 
-egui       = { version = "=0.27.2", features = ["bytemuck", "mint"] }
-egui-wgpu  = { version = "=0.27.2", features = ["winit"] }
-egui-winit = { version = "=0.27.2" }
-wgpu       = "=0.19.1"
-winit      = { version = "=0.29.4", features = ["rwh_05"] }
+# egui       = { version = "=0.27.2", features = ["bytemuck", "mint"] }
+# egui-wgpu  = { version = "=0.27.2", features = ["winit"] }
+# egui-winit = { version = "=0.27.2" }
+wgpu  = "=0.19.1"
+winit = { version = "=0.29.4", features = ["rwh_05"] }
 
 
 bytemuck   = { version = "1.15.0", features = ["derive", "min_const_generics"] }
 env_logger = "0.11"
 log        = "0.4"
 pollster   = "0.3.0"
-typed-path = "0.9.0"
 velcro     = "0.5.4"
