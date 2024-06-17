@@ -4,16 +4,18 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	engine_3d::TextureAsset,
-	src,
+	engine_3d::{ShaderBuilder, TextureAsset},
 };
 use wgpu::{
-	include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
 	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
 	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
 };
 
-use crate::core::{display::Gpu, gameloop::Render, render_target::RenderTarget};
+use crate::{
+	core::{display::Gpu, gameloop::Render, render_target::RenderTarget},
+	SHADER_MAP,
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -53,9 +55,13 @@ pub struct ComputeRenderer {
 impl ComputeRenderer {
 	pub fn new(gpu: &Gpu) -> Self {
 		// Statically include the shader in the executable
-		let shader = gpu
-			.device
-			.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
+		// let shader = gpu
+		// 	.device
+		// 	.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
+		let shader = ShaderBuilder::new(&SHADER_MAP)
+			.include("compute.wgsl")
+			.build(&gpu.device)
+			.expect("Couldn't build shader");
 
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(

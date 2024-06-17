@@ -431,6 +431,7 @@ dependencies = [
  "paste",
  "phf",
  "regex",
+ "typed-path",
  "vek",
  "wgpu",
  "winit",
@@ -1822,12 +1823,11 @@ dependencies = [
  "egui-winit",
  "env_logger",
  "glob",
- "include_dir",
  "log",
- "once_cell",
  "phf",
  "phf_codegen",
  "pollster",
+ "typed-path",
  "velcro",
  "wgpu",
  "winit",
@@ -2413,6 +2413,12 @@ checksum = "deb68604048ff8fa93347f02441e4487594adc20bb8a084f9e564d2b827a0a9f"
 dependencies = [
  "rustc-hash",
 ]
+
+[[package]]
+name = "typed-path"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8a3023f4683cd1a846dbd2666e8c34f54338ee5cebae578cda981a87cecd7aa"
 
 [[package]]
 name = "typeid"

@@ -28,7 +28,7 @@ use crate::{
 		gameloop::{Render, Update},
 		render_target::RenderTarget,
 	},
-	SHADER_DIR,
+	SHADER_MAP,
 };
 
 /*
@@ -101,7 +101,7 @@ impl ComposeRenderer {
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
-		let shader = ShaderBuilder::new(&SHADER_DIR)
+		let shader = ShaderBuilder::new(&SHADER_MAP)
 			.include("compose.wgsl")
 			.build(&gpu.device)
 			.expect("Couldn't build shader");

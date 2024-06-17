@@ -11,7 +11,7 @@ use core::{
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::{bevy::App, engine_3d::ShaderDir};
+use brainrot::{bevy::App, engine_3d::ShaderMap};
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
 	compute::{ComputeRenderPass, ComputeRendererPlugin},
@@ -24,7 +24,7 @@ use rendering::{
 --------------------------------------------------------------------------------
 */
 
-static SHADER_DIR: ShaderDir = include!(concat!(env!("OUT_DIR"), "/shader_dir.rs"));
+const SHADER_MAP: ShaderMap = include!(concat!(env!("OUT_DIR"), "/shader_dir.rs"));
 
 pub trait EntityLabel {}
 
