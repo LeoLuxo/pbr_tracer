@@ -6,7 +6,7 @@ use std::{
 use bevy_ecs::{schedule::ScheduleLabel, world::World};
 use brainrot::{
 	bevy::{self, App, Plugin, PluginsState},
-	math::Converter,
+	Converter,
 };
 use log::trace;
 use winit::event::{DeviceEvent, Event, KeyEvent, WindowEvent};

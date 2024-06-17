@@ -4,7 +4,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	engine_3d::{ShaderBuilder, TextureAsset},
+	ShaderBuilder, TextureAsset,
 };
 use wgpu::{
 	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,

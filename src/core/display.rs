@@ -3,8 +3,7 @@ use std::sync::Arc;
 use bevy_ecs::{change_detection::DetectChanges, event::EventReader, system::ResMut};
 use brainrot::{
 	bevy::{self, App, Plugin},
-	math::Converter,
-	size, ScreenSize,
+	size, Converter, ScreenSize,
 };
 use wgpu::{
 	Adapter, Backends, Device, DeviceDescriptor, Features, Instance, InstanceDescriptor, InstanceFlags, Limits,

@@ -5,8 +5,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	engine_3d::ShaderBuilder,
-	ScreenSize,
+	ScreenSize, ShaderBuilder,
 };
 use velcro::vec;
 use wgpu::{

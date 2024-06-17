@@ -6,8 +6,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	math::Converter,
-	ScreenSize,
+	Converter, ScreenSize,
 };
 use wgpu::{
 	CommandBuffer, PresentMode, Surface, SurfaceCapabilities, SurfaceConfiguration, SurfaceTexture, TextureUsages,
