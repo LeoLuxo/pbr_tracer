@@ -58,9 +58,9 @@ impl ComputeRenderer {
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
-		let shader = ShaderBuilder::new(&SHADER_MAP)
+		let shader = ShaderBuilder::new()
 			.include("compute.wgsl")
-			.build(&gpu.device)
+			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 
 		// The output texture that the compute will write to

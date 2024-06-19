@@ -100,9 +100,9 @@ impl ComposeRenderer {
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
-		let shader = ShaderBuilder::new(&SHADER_MAP)
+		let shader = ShaderBuilder::new()
 			.include("compose.wgsl")
-			.build(&gpu.device)
+			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.
