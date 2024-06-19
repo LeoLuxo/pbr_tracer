@@ -1,4 +1,5 @@
 pub mod core;
+pub mod raytracer;
 pub mod rendering;
 
 use core::{
@@ -13,6 +14,7 @@ use core::{
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, include_shader_source_map, ShaderSourceMap};
+use raytracer::PhysBasedRaytracer;
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
 	compute::{ComputeRenderPass, ComputeRendererPlugin},
@@ -38,20 +40,23 @@ type EventLoop = winit::event_loop::EventLoop<()>;
 --------------------------------------------------------------------------------
 */
 
+type CurrentRenderer = PhysBasedRaytracer;
+
 pub fn run() {
 	AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
 	App::new()
+		// Standalone raytracer plugins
+		.add_plugin(GpuPlugin)
+		.add_plugin(ComputeRendererPlugin)
 		// Core plugins
 		.add_plugin(EventProcessingPlugin)
 		.add_plugin(EventsPlugin)
 		.add_plugin(GameloopPlugin)
-		.add_plugin(GpuPlugin)
 		.add_plugin(DisplayPlugin)
 		.add_plugin(WindowRenderTargetPlugin)
 		// Rendering plugins
 		.add_plugin(RenderPlugin)
-		.add_plugin(ComputeRendererPlugin)
 		.add_plugin(ComposeRendererPlugin)
 		// Configure Renderpass order
 		.configure_sets(

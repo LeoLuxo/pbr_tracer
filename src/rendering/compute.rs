@@ -4,7 +4,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	ShaderBuilder, TextureAsset,
+	Shader, ShaderBuilder, TextureAsset,
 };
 use wgpu::{
 	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
@@ -29,7 +29,7 @@ impl Plugin for ComputeRendererPlugin {
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
-		let compute_renderer = ComputeRenderer::new(gpu);
+		let compute_renderer = ComputeRenderer::new::<crate::CurrentRenderer>(gpu);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -46,6 +46,14 @@ pub struct ComputeRenderPass;
 --------------------------------------------------------------------------------
 */
 
+pub trait RenderFragment {
+	fn shader() -> impl Into<Shader>;
+}
+
+/// Shader API:
+/// render_pixel(coords: vec3f) -> vec4f
+pub trait Renderer: RenderFragment {}
+
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
@@ -53,13 +61,14 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new(gpu: &Gpu) -> Self {
+	pub fn new<R: Renderer>(gpu: &Gpu) -> Self {
 		// Statically include the shader in the executable
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
 		let shader = ShaderBuilder::new()
-			.include("compute.wgsl")
+			.include(R::shader())
+			.include_path("compute.wgsl")
 			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 

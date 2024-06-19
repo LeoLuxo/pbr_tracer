@@ -101,7 +101,7 @@ impl ComposeRenderer {
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
 		let shader = ShaderBuilder::new()
-			.include("compose.wgsl")
+			.include_path("compose.wgsl")
 			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 
