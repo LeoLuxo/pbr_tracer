@@ -5,7 +5,7 @@ use bevy_ecs::{
 use brainrot::bevy::{self, App, Plugin};
 use wgpu::TextureViewDescriptor;
 
-use crate::core::{display::Gpu, gameloop::Render, render_target::RenderTarget};
+use crate::core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget};
 
 /*
 --------------------------------------------------------------------------------

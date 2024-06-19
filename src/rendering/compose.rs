@@ -21,10 +21,10 @@ use super::compute::ComputeRenderer;
 use crate::{
 	core::{
 		buffer::{self, UniformBuffer},
-		display::Gpu,
 		event_processing::{EventReaderProcessor, ProcessedChangeEvents},
 		events::WindowResizedEvent,
 		gameloop::{Render, Update},
+		gpu::Gpu,
 		render_target::RenderTarget,
 	},
 	SHADER_MAP,

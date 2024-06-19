@@ -1,5 +1,5 @@
-use brainrot::build_shader_map;
+use brainrot::build_shader_source_map;
 
 fn main() {
-	build_shader_map!("src/shader/");
+	build_shader_source_map!("src/shader/");
 }

@@ -13,7 +13,7 @@ use wgpu::{
 };
 
 use crate::{
-	core::{display::Gpu, gameloop::Render, render_target::RenderTarget},
+	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	SHADER_MAP,
 };
 

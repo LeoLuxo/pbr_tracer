@@ -6,12 +6,13 @@ use core::{
 	event_processing::EventProcessingPlugin,
 	events::EventsPlugin,
 	gameloop::{GameloopPlugin, Render},
+	gpu::GpuPlugin,
 	render_target::WindowRenderTargetPlugin,
 };
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::{bevy::App, include_shader_map, ShaderSourceMap};
+use brainrot::{bevy::App, include_shader_source_map, ShaderSourceMap};
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
 	compute::{ComputeRenderPass, ComputeRendererPlugin},
@@ -24,7 +25,7 @@ use rendering::{
 --------------------------------------------------------------------------------
 */
 
-const SHADER_MAP: ShaderSourceMap = include_shader_map!();
+const SHADER_MAP: ShaderSourceMap = include_shader_source_map!();
 
 pub trait EntityLabel {}
 
@@ -45,6 +46,7 @@ pub fn run() {
 		.add_plugin(EventProcessingPlugin)
 		.add_plugin(EventsPlugin)
 		.add_plugin(GameloopPlugin)
+		.add_plugin(GpuPlugin)
 		.add_plugin(DisplayPlugin)
 		.add_plugin(WindowRenderTargetPlugin)
 		// Rendering plugins

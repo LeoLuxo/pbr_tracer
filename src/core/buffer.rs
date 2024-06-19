@@ -7,7 +7,7 @@ use wgpu::{
 	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, Device, ShaderStages,
 };
 
-use super::{display::Gpu, gameloop::PreRender};
+use super::{gameloop::PreRender, gpu::Gpu};
 
 /*
 --------------------------------------------------------------------------------
