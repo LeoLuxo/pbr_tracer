@@ -1,6 +1,6 @@
-use brainrot::{bevy, path, rooted_path, Shader};
+use brainrot::{path, Shader};
 
-use crate::rendering::compute::{RenderFragment, Renderer};
+use crate::core::rendering::compute::{RenderFragment, Renderer};
 
 /*
 --------------------------------------------------------------------------------

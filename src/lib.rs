@@ -1,6 +1,5 @@
 pub mod core;
-pub mod raytracer;
-pub mod rendering;
+pub mod renderers;
 
 use core::{
 	display::DisplayPlugin,
@@ -14,12 +13,12 @@ use core::{
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, include_shader_source_map, ShaderSourceMap};
-use raytracer::PhysBasedRaytracer;
-use rendering::{
+use core::rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
-	compute::{ComputeRenderPass, ComputeRendererPlugin, Renderer},
+	compute::{ComputeRenderPass, ComputeRendererPlugin},
 	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
 };
+use renderers::pathtracer::PhysBasedRaytracer;
 
 /*
 --------------------------------------------------------------------------------
