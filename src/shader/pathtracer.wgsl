@@ -1,6 +1,10 @@
 
 
 fn render_pixel(coord: vec2f) -> vec4f {
+	if (coord.x < 0.01 && coord.x > -0.01 && coord.y < 0.01 && coord.y > -0.01) {
+		return vec4f(1, 0, 0, 1);
+	}
+
 	let ray_origin = vec3f(0, 0, -5);
 	let ray_target = vec3f(0);
 	
