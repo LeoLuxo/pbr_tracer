@@ -23,9 +23,17 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct ComputeRendererPlugin;
+pub struct ComputeRendererPlugin<P>
+where
+	P: Renderer,
+{
+	pub asd: P,
+}
 
-impl Plugin for ComputeRendererPlugin {
+impl<P> Plugin for ComputeRendererPlugin<P>
+where
+	P: Renderer + 'static,
+{
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
@@ -46,7 +54,7 @@ pub struct ComputeRenderPass;
 --------------------------------------------------------------------------------
 */
 
-pub trait RenderFragment {
+pub trait RenderFragment: Sync + Send {
 	fn shader() -> impl Into<Shader>;
 }
 

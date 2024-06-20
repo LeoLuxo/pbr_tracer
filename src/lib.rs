@@ -17,7 +17,7 @@ use brainrot::{bevy::App, include_shader_source_map, ShaderSourceMap};
 use raytracer::PhysBasedRaytracer;
 use rendering::{
 	compose::{ComposeRenderPass, ComposeRendererPlugin},
-	compute::{ComputeRenderPass, ComputeRendererPlugin},
+	compute::{ComputeRenderPass, ComputeRendererPlugin, Renderer},
 	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
 };
 
@@ -48,7 +48,9 @@ pub fn run() {
 	App::new()
 		// Standalone raytracer plugins
 		.add_plugin(GpuPlugin)
-		.add_plugin(ComputeRendererPlugin)
+		.add_plugin(ComputeRendererPlugin {
+			asd: PhysBasedRaytracer,
+		})
 		// Core plugins
 		.add_plugin(EventProcessingPlugin)
 		.add_plugin(EventsPlugin)
