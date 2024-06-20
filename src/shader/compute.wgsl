@@ -4,9 +4,9 @@
 @compute
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {
-	let coord = vec3f(gid) / vec3f(num_workgroups) * 2.0 - 1.0;
+	let coord = vec3f(gid).xy / f32(num_workgroups.y) * 2.0 - 1.0;
 	
 	let color = render_pixel(coord);
 	
-	textureStore(out_texture, gid.xy, vec4(coord, 1));
+	textureStore(out_texture, gid.xy, color);
 }

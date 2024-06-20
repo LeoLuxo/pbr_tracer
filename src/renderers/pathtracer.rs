@@ -1,4 +1,4 @@
-use brainrot::{path, Shader};
+use brainrot::{path, Shader, ShaderBuilder};
 
 use crate::core::rendering::compute::{RenderFragment, Renderer};
 
@@ -13,6 +13,8 @@ impl Renderer for PhysBasedRaytracer {}
 
 impl RenderFragment for PhysBasedRaytracer {
 	fn shader() -> impl Into<Shader> {
-		path!("pathtracer.wgsl")
+		ShaderBuilder::new()
+			.include_path("pathtracer.wgsl")
+			.include_path("raymarch/raymarch.wgsl")
 	}
 }

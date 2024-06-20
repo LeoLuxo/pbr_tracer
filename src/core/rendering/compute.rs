@@ -83,7 +83,7 @@ impl ComputeRenderer {
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
-			(10, 10).into(),
+			(480, 270).into(),
 			FilterMode::Nearest,
 			TextureFormat::Rgba32Float,
 			Some("Output texture"),

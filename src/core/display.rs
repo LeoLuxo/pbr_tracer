@@ -33,7 +33,7 @@ impl Plugin for DisplayPlugin {
 	fn build(&self, app: &mut App) {
 		let window_settings = WindowSettings {
 			title: "Pew Pew Ray Thingie",
-			size: size!(1600, 900),
+			size: size!(1920, 1080),
 		};
 
 		let event_loop = EventLoop::new().expect("Couldn't create winit event_loop");
