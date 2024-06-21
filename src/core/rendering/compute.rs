@@ -4,7 +4,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	Shader, ShaderBuilder, TextureAsset,
+	ShaderBuilder, TextureAsset,
 };
 use wgpu::{
 	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
@@ -12,6 +12,7 @@ use wgpu::{
 	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
 };
 
+use super::render_fragments::Renderer;
 use crate::{
 	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	SHADER_MAP,
@@ -23,21 +24,16 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct ComputeRendererPlugin<P>
-where
-	P: Renderer,
-{
-	pub asd: P,
-}
+pub struct ComputeRendererPlugin<R: Renderer>(pub R);
 
-impl<P> Plugin for ComputeRendererPlugin<P>
+impl<R> Plugin for ComputeRendererPlugin<R>
 where
-	P: Renderer + 'static,
+	R: Renderer + 'static,
 {
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
-		let compute_renderer = ComputeRenderer::new::<crate::CurrentRenderer>(gpu);
+		let compute_renderer = ComputeRenderer::new(gpu, &self.0);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -54,14 +50,6 @@ pub struct ComputeRenderPass;
 --------------------------------------------------------------------------------
 */
 
-pub trait RenderFragment: Sync + Send {
-	fn shader() -> impl Into<Shader>;
-}
-
-/// Shader API:
-/// render_pixel(coords: vec3f) -> vec4f
-pub trait Renderer: RenderFragment {}
-
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
@@ -69,16 +57,17 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new<R: Renderer>(gpu: &Gpu) -> Self {
+	pub fn new<R: Renderer>(gpu: &Gpu, renderer: &R) -> Self {
 		// Statically include the shader in the executable
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
-		let shader = ShaderBuilder::new()
-			.include(R::shader())
-			.include_path("compute.wgsl")
-			.build(&SHADER_MAP, &gpu.device)
-			.expect("Couldn't build shader");
+		let mut shader = ShaderBuilder::new();
+		shader.include(renderer.shader()).include_path("compute.wgsl");
+
+		println!("{}", shader.clone().build_source(&SHADER_MAP).unwrap());
+
+		let shader = shader.build(&SHADER_MAP, &gpu.device).expect("Couldn't build shader");
 
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(

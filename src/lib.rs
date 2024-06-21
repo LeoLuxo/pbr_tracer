@@ -8,17 +8,18 @@ use core::{
 	gameloop::{GameloopPlugin, Render},
 	gpu::GpuPlugin,
 	render_target::WindowRenderTargetPlugin,
+	rendering::{
+		compose::{ComposeRenderPass, ComposeRendererPlugin},
+		compute::{ComputeRenderPass, ComputeRendererPlugin},
+		render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
+		render_fragments::PostProcessingPipeline,
+	},
 };
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, include_shader_source_map, ShaderSourceMap};
-use core::rendering::{
-	compose::{ComposeRenderPass, ComposeRendererPlugin},
-	compute::{ComputeRenderPass, ComputeRendererPlugin},
-	render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
-};
-use renderers::pathtracer::PhysBasedRaytracer;
+use renderers::{pathtracer::PhysBasedRaytracer, post_processing::GammaCorrection};
 
 /*
 --------------------------------------------------------------------------------
@@ -39,17 +40,15 @@ type EventLoop = winit::event_loop::EventLoop<()>;
 --------------------------------------------------------------------------------
 */
 
-type CurrentRenderer = PhysBasedRaytracer;
-
 pub fn run() {
 	AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
 	App::new()
 		// Standalone raytracer plugins
 		.add_plugin(GpuPlugin)
-		.add_plugin(ComputeRendererPlugin {
-			asd: PhysBasedRaytracer,
-		})
+		.add_plugin(ComputeRendererPlugin(PhysBasedRaytracer {
+			ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
+		}))
 		// Core plugins
 		.add_plugin(EventProcessingPlugin)
 		.add_plugin(EventsPlugin)

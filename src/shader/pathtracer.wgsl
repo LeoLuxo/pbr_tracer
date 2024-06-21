@@ -15,7 +15,8 @@ fn render_pixel(coord: vec2f) -> vec4f {
 	let ray_dir = view_mat * normalize(vec3f(coord, focal_length));
 	
 	var color = send_ray(ray_origin, ray_dir);
-	// color = pow(color, vec3(0.4545));
+	
+	CALL_POST_PROCESSING_PIPELINE
 
 	return color;
 }
