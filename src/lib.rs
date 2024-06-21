@@ -9,7 +9,7 @@ use core::{
 	gpu::GpuPlugin,
 	render_target::WindowRenderTargetPlugin,
 	rendering::{
-		compose::{ComposeRenderPass, ComposeRendererPlugin},
+		composite::{CompositeRenderPass, CompositeRendererPlugin},
 		compute::{ComputeRenderPass, ComputeRendererPlugin},
 		render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
 		render_fragments::PostProcessingPipeline,
@@ -49,8 +49,7 @@ pub fn run() {
 		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(10, 10),
 			renderer: PhysBasedRaytracer {
-				// ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
-				ppp: None,
+				ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
 			},
 		})
 		// Core plugins
@@ -61,13 +60,13 @@ pub fn run() {
 		.add_plugin(WindowRenderTargetPlugin)
 		// Rendering plugins
 		.add_plugin(RenderPlugin)
-		.add_plugin(ComposeRendererPlugin)
+		.add_plugin(CompositeRendererPlugin)
 		// Configure Renderpass order
 		.configure_sets(
 			Render,
 			((
 				PreRenderPass,
-				(ComputeRenderPass, ComposeRenderPass).chain().in_set(InnerRenderPass),
+				(ComputeRenderPass, CompositeRenderPass).chain().in_set(InnerRenderPass),
 				PostRenderPass,
 			)
 				.chain()

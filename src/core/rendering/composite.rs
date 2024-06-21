@@ -36,9 +36,9 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct ComposeRendererPlugin;
+pub struct CompositeRendererPlugin;
 
-impl Plugin for ComposeRendererPlugin {
+impl Plugin for CompositeRendererPlugin {
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 		let render_target = app.world.resource::<RenderTarget>();
@@ -51,7 +51,7 @@ impl Plugin for ComposeRendererPlugin {
 			UniformBuffer::<ViewportInfo>::new(&gpu.device, "viewport", ShaderStages::FRAGMENT),
 		);
 
-		let compose_renderer = ComposeRenderer::new(
+		let composite_renderer = CompositeRenderer::new(
 			gpu,
 			render_target,
 			computer_renderer,
@@ -61,15 +61,15 @@ impl Plugin for ComposeRendererPlugin {
 		buffer::register_uniform::<ViewportInfo>(app);
 		app.world.spawn(viewport_buffer);
 
-		app.world.insert_resource(compose_renderer);
+		app.world.insert_resource(composite_renderer);
 
 		app.add_systems(Update, resize);
-		app.add_systems(Render, (render).in_set(ComposeRenderPass).chain());
+		app.add_systems(Render, (render).in_set(CompositeRenderPass).chain());
 	}
 }
 
 #[derive(bevy::SystemSet, Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct ComposeRenderPass;
+pub struct CompositeRenderPass;
 
 /*
 --------------------------------------------------------------------------------
@@ -84,12 +84,12 @@ pub struct ViewportInfo {
 }
 
 #[derive(bevy::Resource)]
-pub struct ComposeRenderer {
+pub struct CompositeRenderer {
 	pipeline: RenderPipeline,
 	texture_bind_group: BindGroup,
 }
 
-impl ComposeRenderer {
+impl CompositeRenderer {
 	pub fn new(
 		gpu: &Gpu,
 		render_target: &RenderTarget,
@@ -99,9 +99,9 @@ impl ComposeRenderer {
 		// Statically include the shader in the executable
 		// let shader = gpu
 		// 	.device
-		// 	.create_shader_module(include_wgsl!(src!("shader/compose.wgsl")));
+		// 	.create_shader_module(include_wgsl!(src!("shader/composite.wgsl")));
 		let shader = ShaderBuilder::new()
-			.include_path("compose.wgsl")
+			.include_path("composite.wgsl")
 			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 
@@ -128,7 +128,7 @@ impl ComposeRenderer {
 					count: None,
 				},
 			],
-			label: Some("Compose bind group layout"),
+			label: Some("Composite bind group layout"),
 		});
 
 		// The bind group actually maps the shader variables to the data on the GPU
@@ -146,7 +146,7 @@ impl ComposeRenderer {
 					resource: BindingResource::Sampler(&compute_renderer.output_texture.sampler),
 				},
 			],
-			label: Some("Compose bind group"),
+			label: Some("Composite bind group"),
 		});
 
 		let bind_group_layouts = &vec![texture_bind_group_layout, ..additional_layouts];
@@ -224,7 +224,7 @@ fn resize(window_events: EventReader<WindowResizedEvent>, mut q: Query<&mut View
 }
 
 fn render(
-	compose_renderer: Res<ComposeRenderer>,
+	composite_renderer: Res<CompositeRenderer>,
 	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
 	q: Query<&UniformBuffer<ViewportInfo>>,
@@ -234,7 +234,7 @@ fn render(
 	// A command encoder takes multiple draw/compute commands that can then be
 	// encoded into a command buffer to be submitted to the queue
 	let mut encoder = gpu.device.create_command_encoder(&CommandEncoderDescriptor {
-		label: Some("ComposeRenderer Command Encoder"),
+		label: Some("CompositeRenderer Command Encoder"),
 	});
 
 	{
@@ -245,7 +245,7 @@ fn render(
 
 		// A render pass records a single pass of a pipeline
 		let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-			label: Some("ComposeRenderer Render Pass"),
+			label: Some("CompositeRenderer Render Pass"),
 			color_attachments: &[Some(RenderPassColorAttachment {
 				view: render_view,
 				resolve_target: None,
@@ -264,9 +264,9 @@ fn render(
 			timestamp_writes: None,
 		});
 
-		render_pass.set_pipeline(&compose_renderer.pipeline);
+		render_pass.set_pipeline(&composite_renderer.pipeline);
 
-		render_pass.set_bind_group(0, &compose_renderer.texture_bind_group, &[]);
+		render_pass.set_bind_group(0, &composite_renderer.texture_bind_group, &[]);
 		render_pass.set_bind_group(1, &q.single().bind_group, &[]);
 
 		// Draw 2 fullscreen triangles
