@@ -35,7 +35,8 @@ pub struct Gpu {
 
 impl Gpu {
 	async fn new(compatible_surface: Option<&Surface<'_>>) -> Self {
-		// Instance is the instance of wgpu which serves as entrypoint for everything wgpu-related
+		// Instance is the instance of wgpu which serves as entrypoint for everything
+		// wgpu-related
 		#[cfg(debug_assertions)]
 		// Not running in --release mode, activate validation and debug info for wgpu
 		let instance = Instance::new(InstanceDescriptor {
@@ -51,7 +52,8 @@ impl Gpu {
 			..Default::default()
 		});
 
-		// Adapter essentially represents the physical GPU + the Backend, e.g. GTX1080_VK; GTX1080_DX12; etc
+		// Adapter essentially represents the physical GPU + the Backend, e.g.
+		// GTX1080_VK; GTX1080_DX12; etc
 		let adapter = instance
 			.request_adapter(&RequestAdapterOptions {
 				power_preference: PowerPreference::HighPerformance,
@@ -61,8 +63,11 @@ impl Gpu {
 			.await
 			.expect("Coudln't request compatible adapter");
 
-		// Device esentially acts like a logical connection to the selected adapter in an application-isolated way. The device is selected based on a descriptor that describes the required features.
-		// Queue is the message queue / command buffer for the GPU, anything that the GPU needs to do should be requested into that queue (i.e. rendering, uploading buffer data, etc)
+		// Device esentially acts like a logical connection to the selected adapter in
+		// an application-isolated way. The device is selected based on a descriptor
+		// that describes the required features. Queue is the message queue / command
+		// buffer for the GPU, anything that the GPU needs to do should be requested
+		// into that queue (i.e. rendering, uploading buffer data, etc)
 		let (device, queue) = adapter
 			.request_device(
 				&(DeviceDescriptor {

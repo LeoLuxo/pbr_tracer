@@ -4,7 +4,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	ShaderBuilder, TextureAsset,
+	ScreenSize, ShaderBuilder, TextureAsset,
 };
 use wgpu::{
 	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
@@ -24,7 +24,10 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct ComputeRendererPlugin<R: Renderer>(pub R);
+pub struct ComputeRendererPlugin<R: Renderer> {
+	pub resolution: ScreenSize,
+	pub renderer: R,
+}
 
 impl<R> Plugin for ComputeRendererPlugin<R>
 where
@@ -33,7 +36,7 @@ where
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
-		let compute_renderer = ComputeRenderer::new(gpu, &self.0);
+		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, &self.renderer);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -57,21 +60,18 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new<R: Renderer>(gpu: &Gpu, renderer: &R) -> Self {
-		// Statically include the shader in the executable
-		// let shader = gpu
-		// 	.device
-		// 	.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
+	pub fn new<R: Renderer>(gpu: &Gpu, resolution: ScreenSize, renderer: &R) -> Self {
+		// Dynamically create shader from the renderer
 		let shader = ShaderBuilder::new()
-			.include(renderer.shader())
 			.include_path("compute.wgsl")
+			.include(renderer.shader())
 			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
-			renderer.resolution(),
+			resolution,
 			FilterMode::Linear,
 			TextureFormat::Rgba32Float,
 			Some("Output texture"),

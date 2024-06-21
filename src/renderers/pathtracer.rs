@@ -1,4 +1,4 @@
-use brainrot::{ScreenSize, Shader, ShaderBuilder};
+use brainrot::{Shader, ShaderBuilder};
 
 use crate::core::rendering::render_fragments::{PostProcessingPipeline, RenderFragment, Renderer};
 
@@ -9,15 +9,10 @@ use crate::core::rendering::render_fragments::{PostProcessingPipeline, RenderFra
 */
 
 pub struct PhysBasedRaytracer {
-	pub resolution: ScreenSize,
 	pub ppp: Option<PostProcessingPipeline>,
 }
 
-impl Renderer for PhysBasedRaytracer {
-	fn resolution(&self) -> ScreenSize {
-		self.resolution
-	}
-}
+impl Renderer for PhysBasedRaytracer {}
 
 impl RenderFragment for PhysBasedRaytracer {
 	fn shader(&self) -> Shader {

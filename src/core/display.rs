@@ -131,7 +131,8 @@ fn toggle_cursor_attached(
 		}
 	}
 
-	// If the display was externally changed, or its cursor_attached was just changed
+	// If the display was externally changed, or its cursor_attached was just
+	// changed
 	needs_update = needs_update || app_window.is_changed();
 
 	// Then detach or attach the cursor
@@ -139,7 +140,8 @@ fn toggle_cursor_attached(
 		if app_window.cursor_attached {
 			attach_cursor(&app_window.winit_window);
 		} else {
-			// Might lead to some problems down the line, if the cursor_attached value was changed externally, then needs_reset wouldn't be set
+			// Might lead to some problems down the line, if the cursor_attached value was
+			// changed externally, then needs_reset wouldn't be set
 			detach_cursor(&app_window.winit_window, needs_reset);
 		}
 	}
@@ -149,7 +151,9 @@ fn attach_cursor(window: &Window) {
 	// game is focused: hide the cursor and lock it in place
 	window.set_cursor_visible(false);
 
-	// [`Locked`] keeps the cursor stuck in the middle of the window (not implemented in windows), [`Confined`] keeps the cursor within the bounds of the window
+	// [`Locked`] keeps the cursor stuck in the middle of the window (not
+	// implemented in windows), [`Confined`] keeps the cursor within the bounds of
+	// the window
 	window
 		.set_cursor_grab(CursorGrabMode::Locked)
 		.or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined))
@@ -161,7 +165,8 @@ fn detach_cursor(window: &Window, reset: bool) {
 	window.set_cursor_visible(true);
 	window.set_cursor_grab(CursorGrabMode::None).unwrap();
 
-	// to make sure the cursor appears to "spawn" in the middle of the window when it appears, force it back to the middle of the window
+	// to make sure the cursor appears to "spawn" in the middle of the window when
+	// it appears, force it back to the middle of the window
 	if reset {
 		window
 			.set_cursor_position(PhysicalPosition::<u32> {

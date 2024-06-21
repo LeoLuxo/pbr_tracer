@@ -131,8 +131,9 @@ impl ComposeRenderer {
 			label: Some("Compose bind group layout"),
 		});
 
-		// The bind group actually maps the shader variables to the data on the GPU memory.
-		// Multiple bind groups can be interchanged as long as they have the same bind group layout.
+		// The bind group actually maps the shader variables to the data on the GPU
+		// memory. Multiple bind groups can be interchanged as long as they have the
+		// same bind group layout.
 		let texture_bind_group = gpu.device.create_bind_group(&BindGroupDescriptor {
 			layout: texture_bind_group_layout,
 			entries: &[
@@ -157,7 +158,8 @@ impl ComposeRenderer {
 			push_constant_ranges: &[],
 		});
 
-		// Create the render pipeline. Specify shader stages, primitive type, stencil/depth information, and some more stuff.
+		// Create the render pipeline. Specify shader stages, primitive type,
+		// stencil/depth information, and some more stuff.
 		let pipeline = gpu.device.create_render_pipeline(&RenderPipelineDescriptor {
 			label: Some("Basic Render Pipeline"),
 			layout: Some(&render_pipeline_layout),
@@ -229,7 +231,8 @@ fn render(
 ) {
 	// trace!("Rendering terrain");
 
-	// A command encoder takes multiple draw/compute commands that can then be encoded into a command buffer to be submitted to the queue
+	// A command encoder takes multiple draw/compute commands that can then be
+	// encoded into a command buffer to be submitted to the queue
 	let mut encoder = gpu.device.create_command_encoder(&CommandEncoderDescriptor {
 		label: Some("ComposeRenderer Command Encoder"),
 	});
@@ -272,7 +275,8 @@ fn render(
 		// 3 -- 4
 		render_pass.draw(0..4, 0..1);
 	}
-	// Extra scope here to make sure render_pass is dropped, otherwise encoder.finish() can't be called
+	// Extra scope here to make sure render_pass is dropped, otherwise
+	// encoder.finish() can't be called
 
 	render_target.command_queue.push(encoder.finish());
 }

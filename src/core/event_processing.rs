@@ -45,7 +45,7 @@ impl Plugin for EventProcessingPlugin {
 		// Order of operation:
 		// * check_signals
 		// * if check passed
-		// * 	clear_events (for each event type)
+		// * clear_events (for each event type)
 		// *	reset_signals + clear_trackers
 		app.add_systems(EventsCore, (check_signals, reset_signals).chain());
 	}
@@ -106,20 +106,25 @@ pub fn signal_schedule<S: ScheduleLabel>(mut schedule_signal: ResMut<ScheduleSig
 	schedule_signal.counter += 1;
 }
 
-/// Checks whether all schedule signals are set (thus all schedules were run), if yes signal the events to be cleared
+/// Checks whether all schedule signals are set (thus all schedules were run),
+/// if yes signal the events to be cleared
 pub fn check_signals(world: &mut World) {
 	let signal_iterstep = world.resource::<ScheduleSignal<IterStep>>();
 	let signal_update = world.resource::<ScheduleSignal<Update>>();
 	let signal_render = world.resource::<ScheduleSignal<Render>>();
 
-	// Only clear events etc if ALL the schedules have been called AT LEAST TWICE since last time
-	// If it was only for the event queue clearing, checking that they were called only ONCE would be enough, since the event queues are double-buffered.
-	// For the world trackers though, if a change were to happen at the end of an iteration (in render for example) where all three schedules were run,
-	// then the trackers would be cleared before the next iteration and none of the other schedules would have been able to detect the change.
+	// Only clear events etc if ALL the schedules have been called AT LEAST TWICE
+	// since last time If it was only for the event queue clearing, checking that
+	// they were called only ONCE would be enough, since the event queues are
+	// double-buffered. For the world trackers though, if a change were to happen
+	// at the end of an iteration (in render for example) where all three schedules
+	// were run, then the trackers would be cleared before the next iteration and
+	// none of the other schedules would have been able to detect the change.
 	if signal_iterstep.counter >= 2 && signal_update.counter >= 2 && signal_render.counter >= 2 {
 		// Signal that events should be cleared
-		// (done in a second step because the generic clearing function needs to be statically called for each event type).
-		// Signals will be reset after all the events are cleared.
+		// (done in a second step because the generic clearing function needs to be
+		// statically called for each event type). Signals will be reset after all the
+		// events are cleared.
 		world.resource_mut::<ClearEvents>().clear = true;
 	}
 }
@@ -131,14 +136,16 @@ pub fn try_clear_events<E: 'static + Send + Sync + Event>(
 ) {
 	if clear_events.clear {
 		// Clear the event queues from the world for event type E
-		// Using the update() function makes it double-buffer instead of truly "clearing" them
+		// Using the update() function makes it double-buffer instead of truly
+		// "clearing" them
 		events.update();
 	}
 }
 
 /// After clearing events, reset the schedule signals + `ClearEvents` signal
-/// This needs to be done in two steps to make sure ALL events types (Events<T>) get cleared before resetting the counter.
-/// Also clear trackers here to avoid doing it multiple times.
+/// This needs to be done in two steps to make sure ALL events types (Events<T>)
+/// get cleared before resetting the counter. Also clear trackers here to avoid
+/// doing it multiple times.
 pub fn reset_signals(world: &mut World) {
 	let mut clear_events = world.resource_mut::<ClearEvents>();
 
@@ -150,9 +157,11 @@ pub fn reset_signals(world: &mut World) {
 		world.resource_mut::<ScheduleSignal<Update>>().counter = 0;
 		world.resource_mut::<ScheduleSignal<Render>>().counter = 0;
 
-		// Calling clear_trackers here makes sure that all my schedules will have had a chance to detect changes,
-		// BUT with the drawback that they might detect a change for multiple frames, making it unreliable-ish.
-		// So change-detection should be used sparingly, in favor of events (since those include automatic per-system read tracking).
+		// Calling clear_trackers here makes sure that all my schedules will have had a
+		// chance to detect changes, BUT with the drawback that they might detect a
+		// change for multiple frames, making it unreliable-ish. So change-detection
+		// should be used sparingly, in favor of events (since those include automatic
+		// per-system read tracking).
 		world.clear_trackers();
 	}
 }
@@ -177,8 +186,9 @@ impl<E: Event> ProcessedEventReader<E> {
 }
 
 pub trait EventReaderProcessor<E: Event> {
-	// Taking ownership of self on purpose here; since process() will read() and thus consume the iterator behind EventReader,
-	// making sure I can't use the EventReader anymore afterwards should hopefully prevent some dumb bugs
+	// Taking ownership of self on purpose here; since process() will read() and
+	// thus consume the iterator behind EventReader, making sure I can't use the
+	// EventReader anymore afterwards should hopefully prevent some dumb bugs
 	fn process(self) -> ProcessedEventReader<E>;
 }
 

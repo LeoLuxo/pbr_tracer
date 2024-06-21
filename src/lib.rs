@@ -46,10 +46,12 @@ pub fn run() {
 	App::new()
 		// Standalone raytracer plugins
 		.add_plugin(GpuPlugin)
-		.add_plugin(ComputeRendererPlugin(PhysBasedRaytracer {
+		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(1920, 1080),
-			ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
-		}))
+			renderer: PhysBasedRaytracer {
+				ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
+			},
+		})
 		// Core plugins
 		.add_plugin(EventProcessingPlugin)
 		.add_plugin(EventsPlugin)

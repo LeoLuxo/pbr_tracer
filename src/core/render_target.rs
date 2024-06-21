@@ -47,7 +47,8 @@ impl Plugin for WindowRenderTargetPlugin {
 --------------------------------------------------------------------------------
 */
 
-//TODO make RenderTarget into a component (or other) to support multiple draw surfaces
+//TODO make RenderTarget into a component (or other) to support multiple draw
+// surfaces
 
 #[derive(bevy::Resource)]
 pub struct RenderTarget<'a> {
@@ -68,7 +69,8 @@ impl<'a> RenderTarget<'a> {
 
 		let size = window.inner_size().convert();
 
-		// Create the rendering surface on which wgpu will render, from a raw_window_handle
+		// Create the rendering surface on which wgpu will render, from a
+		// raw_window_handle
 		let surface = gpu
 			.instance
 			.create_surface(window)
