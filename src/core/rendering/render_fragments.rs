@@ -57,7 +57,7 @@ impl RenderFragment for PostProcessingPipeline {
 */
 
 /// Shader API:\
-/// `fn render_pixel(coord: vec2f) -> vec4f`
+/// `fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f`
 pub trait Renderer: RenderFragment {}
 
 /// Shader API:\

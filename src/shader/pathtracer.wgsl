@@ -1,6 +1,11 @@
 
 
-fn render_pixel(coord: vec2f) -> vec4f {
+fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f {
+	let coord = (pixel_coord - pixel_size / 2.0) / pixel_size.y;
+	return render(coord);
+}
+
+fn render(coord: vec2f) -> vec4f {
 	if (coord.x < 0.01 && coord.x > -0.01 && coord.y < 0.01 && coord.y > -0.01) {
 		return vec4f(1, 0, 0, 1);
 	}
