@@ -72,7 +72,7 @@ impl ComputeRenderer {
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
 			resolution,
-			FilterMode::Linear,
+			FilterMode::Nearest,
 			TextureFormat::Rgba32Float,
 			Some("Output texture"),
 		);

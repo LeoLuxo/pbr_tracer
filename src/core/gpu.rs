@@ -76,7 +76,8 @@ impl Gpu {
 						// | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
 						| Features::CONSERVATIVE_RASTERIZATION
 						| Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-						| Features::FLOAT32_FILTERABLE,
+						| Features::FLOAT32_FILTERABLE
+						| Features::ADDRESS_MODE_CLAMP_TO_BORDER,
 					required_limits: Limits::default(),
 					label: None,
 				}),

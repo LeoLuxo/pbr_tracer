@@ -15,8 +15,22 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4f
 
 @fragment
 fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
-	let coord = frag_coord.xy / vec2f(viewport_size);
+	let texture_size = vec2f(textureDimensions(out_texture));
+	let screen_size = vec2f(viewport_size);
+	
+	var tex_coord: vec2f;
+	
+	if texture_size.x / texture_size.y < screen_size.x / screen_size.y {
+		// texture is TALLER than the screen
+		tex_coord.x = frag_coord.x / screen_size.x;
+		let size_y = screen_size.y / screen_size.x / texture_size.y * texture_size.x;
+		tex_coord.y = frag_coord.y / screen_size.y * size_y + (1.0 - size_y) * 0.5;
+	} else {
+		// texture is WIDER than the screen
+		tex_coord.y = frag_coord.y / screen_size.y;
+		let size_x = screen_size.x / screen_size.y / texture_size.x * texture_size.y;
+		tex_coord.x = frag_coord.x / screen_size.x * size_x + (1.0 - size_x) * 0.5;
+	}
 
-	// return vec4(frag_coord.xy / vec2f(viewport_size), 0, 1);
-	return textureSample(out_texture, out_sampler, coord);
+	return textureSample(out_texture, out_sampler, tex_coord);
 }
