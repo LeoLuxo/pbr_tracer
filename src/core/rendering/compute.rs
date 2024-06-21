@@ -62,17 +62,16 @@ impl ComputeRenderer {
 		// let shader = gpu
 		// 	.device
 		// 	.create_shader_module(include_wgsl!(src!("shader/compute.wgsl")));
-		let mut shader = ShaderBuilder::new();
-		shader.include(renderer.shader()).include_path("compute.wgsl");
-
-		println!("{}", shader.clone().build_source(&SHADER_MAP).unwrap());
-
-		let shader = shader.build(&SHADER_MAP, &gpu.device).expect("Couldn't build shader");
+		let shader = ShaderBuilder::new()
+			.include(renderer.shader())
+			.include_path("compute.wgsl")
+			.build(&SHADER_MAP, &gpu.device)
+			.expect("Couldn't build shader");
 
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
-			(480, 270).into(),
+			renderer.resolution(),
 			FilterMode::Linear,
 			TextureFormat::Rgba32Float,
 			Some("Output texture"),

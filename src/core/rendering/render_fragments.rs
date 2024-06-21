@@ -1,4 +1,4 @@
-use brainrot::{Shader, ShaderBuilder};
+use brainrot::{ScreenSize, Shader, ShaderBuilder};
 
 /*
 --------------------------------------------------------------------------------
@@ -58,7 +58,9 @@ impl RenderFragment for PostProcessingPipeline {
 
 /// Shader API:\
 /// `fn render_pixel(coord: vec2f) -> vec4f`
-pub trait Renderer: RenderFragment {}
+pub trait Renderer: RenderFragment {
+	fn resolution(&self) -> ScreenSize;
+}
 
 /// Shader API:\
 /// `fn post_processing_effect(coord: vec2f, color: vec4f) -> vec4f`
