@@ -1,10 +1,6 @@
-use std::iter;
-
 use brainrot::{Shader, ShaderBuilder};
 
-use crate::core::rendering::render_fragments::{
-	PostProcessingPipeline, RenderFragment, RenderFragmentIterator, Renderer,
-};
+use crate::core::rendering::render_fragments::{PostProcessingPipeline, RenderFragment, Renderer};
 
 /*
 --------------------------------------------------------------------------------
@@ -36,13 +32,5 @@ impl RenderFragment for PhysBasedRaytracer {
 		}
 
 		builder.into()
-	}
-
-	fn iter_sub_fragments<'a>(&'a self) -> RenderFragmentIterator<'a> {
-		if let Some(ppp) = &self.ppp {
-			Box::new(iter::once(ppp as &'a dyn RenderFragment))
-		} else {
-			Box::new(iter::empty())
-		}
 	}
 }

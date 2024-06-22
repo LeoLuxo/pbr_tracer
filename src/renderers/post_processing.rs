@@ -16,8 +16,4 @@ impl RenderFragment for GammaCorrection {
 	fn shader(&self) -> Shader {
 		path!("/post_processing/gamma.wgsl").into()
 	}
-
-	// fn iter_sub_fragments(&self) -> &dyn Iterator<Item = &dyn RenderFragment> {
-	// 	todo!()
-	// }
 }

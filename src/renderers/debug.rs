@@ -16,8 +16,4 @@ impl RenderFragment for DebugRenderer {
 	fn shader(&self) -> Shader {
 		path!("/debug.wgsl").into()
 	}
-
-	// fn iter_sub_fragments(&self) -> &dyn Iterator<Item = &dyn RenderFragment> {
-	// 	todo!()
-	// }
 }
