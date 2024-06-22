@@ -6,8 +6,27 @@ use brainrot::{Shader, ShaderBuilder};
 --------------------------------------------------------------------------------
 */
 
+pub struct RenderFragmentIterator<'a>(Box<dyn Iterator<Item = &'a (dyn RenderFragment + 'a)> + 'a>);
+
+impl<'a, T> From<dyn Iterator<Item = T>> for RenderFragmentIterator<'a>
+where
+	T: RenderFragment,
+{
+	fn from(value: Iterator) -> Self {
+		todo!()
+	}
+}
+
+impl FromIterator for RenderFragmentIterator {
+	fn from_iter<T: IntoIterator<Item = A>>(iter: T) -> Self {
+		todo!()
+	}
+}
+
 pub trait RenderFragment: Sync + Send {
 	fn shader(&self) -> Shader;
+	fn iter_sub_fragments(&self) -> RenderFragmentIterator<'_>;
+	// fn register(&self) -> Shader;
 }
 
 /// Shader API:\
@@ -47,6 +66,10 @@ impl RenderFragment for PostProcessingPipeline {
 		builder.define("CALL_EFFECTS", pipeline);
 
 		builder.into()
+	}
+
+	fn iter_sub_fragments(&self) -> &dyn Iterator<Item = &dyn RenderFragment> {
+		todo!()
 	}
 }
 
