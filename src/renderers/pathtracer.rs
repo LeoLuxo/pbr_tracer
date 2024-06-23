@@ -13,6 +13,7 @@ use crate::core::{
 --------------------------------------------------------------------------------
 */
 
+#[derive(Clone)]
 pub struct PhysBasedRaytracer {
 	pub ppp: Option<PostProcessingPipeline>,
 }

@@ -4,6 +4,7 @@ use std::{
 };
 
 use brainrot::{Shader, ShaderBuilder};
+use dyn_clone::DynClone;
 
 /*
 --------------------------------------------------------------------------------
@@ -22,21 +23,27 @@ impl<'a> RenderFragmentIter<'a> {
 	}
 
 	pub fn new_borrowed(iter: impl Iterator<Item = &'a (impl RenderFragment + 'a)> + 'a) -> Self {
-		RenderFragmentIter::Borrowed(Box::new(iter.map(|v| v as &'a dyn RenderFragment)))
+		let iter = iter.into_iter().map(|v| v as &'a dyn RenderFragment);
+		RenderFragmentIter::Borrowed(Box::new(iter))
 	}
 
-	pub fn new_owned(iter: impl Iterator<Item = Box<impl RenderFragment + 'static>> + 'static) -> Self {
-		RenderFragmentIter::Owned(Box::new(iter.map(|v| v as Box<dyn RenderFragment>)))
+	pub fn new_owned(iter: impl Iterator<Item = T> + 'static) where T : -> Self {
+		let iter = iter
+			.into_iter()
+			.map(|v| dyn_clone::clone_box(&*v) as Box<dyn RenderFragment>);
+		RenderFragmentIter::Owned(Box::new(iter))
 	}
 }
 
-// impl<'a, T, I> From<T> for RenderFragmentIter<'a>
+// impl<'a, T, F> From<T> for RenderFragmentIter<'a>
 // where
-// 	T: Iterator<Item = &'a I> + 'a,
-// 	I: RenderFragment + 'a,
+// 	T: Iterator<Item = &'a F> + 'static,
+// 	F: RenderFragment + 'static,
 // {
 // 	fn from(value: T) -> Self {
-// 		Self::Borrowed(Box::new(value.map(|v| v as &dyn RenderFragment)))
+// 		Self::Owned(Box::new(
+// 			value.map(|v| dyn_clone::clone_box(&*v) as Box<dyn RenderFragment>),
+// 		))
 // 	}
 // }
 
@@ -75,9 +82,11 @@ impl<'a> RenderFragmentIter<'a> {
 // RenderFragment>))) 	}
 // }
 
-pub trait RenderFragment: Sync + Send {
+pub trait RenderFragment: Sync + Send + DynClone {
 	fn shader(&self) -> Shader;
 }
+
+dyn_clone::clone_trait_object!(RenderFragment);
 
 /*
 --------------------------------------------------------------------------------
@@ -87,7 +96,7 @@ pub trait RenderFragment: Sync + Send {
 
 /// Shader API:\
 /// `fn post_processing_pipeline(coord: vec2f, color: vec4f) -> vec4f`
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct PostProcessingPipeline(Vec<Box<dyn RenderFragment>>);
 
 impl PostProcessingPipeline {
@@ -101,7 +110,7 @@ impl PostProcessingPipeline {
 	}
 
 	fn sub_fragments(&self) -> RenderFragmentIter {
-		RenderFragmentIter::new_owned(self.0)
+		RenderFragmentIter::new_owned(self.0.iter())
 	}
 }
 

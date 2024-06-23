@@ -8,6 +8,7 @@ use crate::core::rendering::render_fragments::{RenderFragment, Renderer};
 --------------------------------------------------------------------------------
 */
 
+#[derive(Clone)]
 pub struct DebugRenderer;
 
 impl Renderer for DebugRenderer {}
