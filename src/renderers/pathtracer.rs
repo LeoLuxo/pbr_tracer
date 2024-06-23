@@ -4,7 +4,7 @@ use brainrot::{Shader, ShaderBuilder};
 
 use crate::core::{
 	gameloop::Render,
-	rendering::render_fragments::{PostProcessingPipeline, RenderFragment, Renderer},
+	rendering::render_fragments::{PostProcessingPipeline, RenderFragment, RenderFragmentIter, Renderer},
 };
 
 /*
@@ -40,26 +40,8 @@ impl RenderFragment for PhysBasedRaytracer {
 	}
 }
 
-struct RenderFragmentIter<'a>(Box<dyn Iterator<Item = &'a dyn RenderFragment> + 'a>);
-
-impl<'a> RenderFragmentIter<'a> {
-	pub fn empty() -> Self {
-		RenderFragmentIter(Box::new(iter::empty::<&dyn RenderFragment>()))
-	}
-}
-
-impl<'a, T, I> From<T> for RenderFragmentIter<'a>
-where
-	T: Iterator<Item = &'a I> + 'a,
-	I: RenderFragment + 'a,
-{
-	fn from(value: T) -> Self {
-		Self(Box::new(value.map(|v| v as &dyn RenderFragment)))
-	}
-}
-
 impl PhysBasedRaytracer {
-	fn iter_sub_fragments(&self) -> RenderFragmentIter {
+	fn sub_fragments(&self) -> RenderFragmentIter {
 		if let Some(ppp) = &self.ppp {
 			iter::once(ppp).into()
 		} else {

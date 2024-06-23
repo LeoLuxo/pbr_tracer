@@ -49,7 +49,7 @@ pub fn run() {
 		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(1000, 500),
 			renderer: PhysBasedRaytracer {
-				ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
+				ppp: Some(PostProcessingPipeline::new().with(GammaCorrection)),
 			},
 			// renderer: DebugRenderer,
 		})

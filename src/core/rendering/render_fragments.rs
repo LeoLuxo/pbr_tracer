@@ -1,3 +1,8 @@
+use std::{
+	iter,
+	slice::{self, Iter},
+};
+
 use brainrot::{Shader, ShaderBuilder};
 
 /*
@@ -6,23 +11,89 @@ use brainrot::{Shader, ShaderBuilder};
 --------------------------------------------------------------------------------
 */
 
+pub enum RenderFragmentIter<'a> {
+	Borrowed(Box<dyn Iterator<Item = &'a dyn RenderFragment> + 'a>),
+	Owned(Box<dyn Iterator<Item = Box<dyn RenderFragment>>>),
+}
+
+impl<'a> RenderFragmentIter<'a> {
+	pub fn empty() -> Self {
+		RenderFragmentIter::Borrowed(Box::new(iter::empty::<&dyn RenderFragment>()))
+	}
+}
+
+impl<'a, T, I> From<T> for RenderFragmentIter<'a>
+where
+	T: Iterator<Item = &'a I> + 'a,
+	I: RenderFragment + 'a,
+{
+	fn from(value: T) -> Self {
+		Self::Borrowed(Box::new(value.map(|v| v as &dyn RenderFragment)))
+	}
+}
+
+// impl<'a, T> From<T> for RenderFragmentIter<'a>
+// where
+// 	T: Iterator<Item = Box<dyn RenderFragment>>,
+// {
+// 	fn from(value: T) -> Self {
+// 		Self::Borrowed(Box::new(value.map(|v| v as &dyn RenderFragment)))
+// 	}
+// }
+
+// impl<'a, F> FromIterator<&'a F> for RenderFragmentIter<'a>
+// where
+// 	F: RenderFragment,
+// {
+// 	fn from_iter<T>(iter: T) -> Self
+// 	where
+// 		T: IntoIterator<Item = &'a F>,
+// 		<T as std::iter::IntoIterator>::IntoIter: 'a,
+// 	{
+// 		iter.into_iter().into()
+// 	}
+// }
+
+// impl<F> FromIterator<Box<F>> for RenderFragmentIter<'_>
+// where
+// 	F: RenderFragment,
+// {
+// 	fn from_iter<T>(iter: T) -> Self
+// 	where
+// 		T: IntoIterator<Item = Box<F>>,
+// 	{
+// 		Self::Owned(Box::new(iter.into_iter().map(|v| v as Box<dyn
+// RenderFragment>))) 	}
+// }
+
 pub trait RenderFragment: Sync + Send {
 	fn shader(&self) -> Shader;
 }
 
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
 /// Shader API:\
 /// `fn post_processing_pipeline(coord: vec2f, color: vec4f) -> vec4f`
 #[derive(Default)]
-pub struct PostProcessingPipeline(Vec<Box<dyn PostProcessingEffect>>);
+pub struct PostProcessingPipeline(Vec<Box<dyn RenderFragment>>);
 
 impl PostProcessingPipeline {
 	pub fn new() -> Self {
 		Self::default()
 	}
 
-	pub fn add_effect(mut self, effect: impl PostProcessingEffect + 'static) -> Self {
+	pub fn with(mut self, effect: impl PostProcessingEffect + 'static) -> Self {
 		self.0.push(Box::new(effect));
 		self
+	}
+
+	fn sub_fragments(&self) -> RenderFragmentIter {
+		let asd = self.0;
+		asd.iter().map(|v| (*v).as_ref()).into()
 	}
 }
 
