@@ -20,17 +20,25 @@ impl<'a> RenderFragmentIter<'a> {
 	pub fn empty() -> Self {
 		RenderFragmentIter::Borrowed(Box::new(iter::empty::<&dyn RenderFragment>()))
 	}
-}
 
-impl<'a, T, I> From<T> for RenderFragmentIter<'a>
-where
-	T: Iterator<Item = &'a I> + 'a,
-	I: RenderFragment + 'a,
-{
-	fn from(value: T) -> Self {
-		Self::Borrowed(Box::new(value.map(|v| v as &dyn RenderFragment)))
+	pub fn new_borrowed(iter: impl Iterator<Item = &'a (impl RenderFragment + 'a)> + 'a) -> Self {
+		RenderFragmentIter::Borrowed(Box::new(iter.map(|v| v as &'a dyn RenderFragment)))
+	}
+
+	pub fn new_owned(iter: impl Iterator<Item = Box<impl RenderFragment + 'static>> + 'static) -> Self {
+		RenderFragmentIter::Owned(Box::new(iter.map(|v| v as Box<dyn RenderFragment>)))
 	}
 }
+
+// impl<'a, T, I> From<T> for RenderFragmentIter<'a>
+// where
+// 	T: Iterator<Item = &'a I> + 'a,
+// 	I: RenderFragment + 'a,
+// {
+// 	fn from(value: T) -> Self {
+// 		Self::Borrowed(Box::new(value.map(|v| v as &dyn RenderFragment)))
+// 	}
+// }
 
 // impl<'a, T> From<T> for RenderFragmentIter<'a>
 // where
@@ -50,7 +58,8 @@ where
 // 		T: IntoIterator<Item = &'a F>,
 // 		<T as std::iter::IntoIterator>::IntoIter: 'a,
 // 	{
-// 		iter.into_iter().into()
+// 		let iter = iter.into_iter().map(|v| v as &'a dyn RenderFragment);
+// 		Self::Borrowed(Box::new(iter))
 // 	}
 // }
 
@@ -92,8 +101,7 @@ impl PostProcessingPipeline {
 	}
 
 	fn sub_fragments(&self) -> RenderFragmentIter {
-		let asd = self.0;
-		asd.iter().map(|v| (*v).as_ref()).into()
+		RenderFragmentIter::new_owned(self.0)
 	}
 }
 
