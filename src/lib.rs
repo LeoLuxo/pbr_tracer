@@ -1,5 +1,5 @@
 pub mod core;
-pub mod renderers;
+pub mod fragments;
 
 use core::{
 	display::DisplayPlugin,
@@ -12,14 +12,16 @@ use core::{
 		composite::{CompositeRenderPass, CompositeRendererPlugin},
 		compute::{ComputeRenderPass, ComputeRendererPlugin},
 		render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
-		render_fragments::PostProcessingPipeline,
 	},
 };
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, include_shader_source_map, size, ShaderSourceMap};
-use renderers::{pathtracer::PhysBasedRaytracer, post_processing::GammaCorrection};
+use fragments::{
+	pathtracer::PhysBasedRaytracer,
+	post_processing::{GammaCorrection, PostProcessingPipeline},
+};
 
 /*
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 use brainrot::{path, Shader};
 
-use crate::core::rendering::render_fragments::{PostProcessingEffect, RenderFragment};
+use super::render_fragments::{RenderFragment, Renderer};
 
 /*
 --------------------------------------------------------------------------------
@@ -8,13 +8,13 @@ use crate::core::rendering::render_fragments::{PostProcessingEffect, RenderFragm
 --------------------------------------------------------------------------------
 */
 
-pub struct GammaCorrection;
+pub struct DebugRenderer;
 
-impl PostProcessingEffect for GammaCorrection {}
+impl Renderer for DebugRenderer {}
 
-impl RenderFragment for GammaCorrection {
+impl RenderFragment for DebugRenderer {
 	fn shader(&self) -> Shader {
-		path!("/post_processing/gamma.wgsl").into()
+		path!("/debug.wgsl").into()
 	}
 
 	fn fragments(&self) -> Vec<&dyn RenderFragment> {

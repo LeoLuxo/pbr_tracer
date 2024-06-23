@@ -12,9 +12,9 @@ use wgpu::{
 	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
 };
 
-use super::render_fragments::Renderer;
 use crate::{
 	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
+	fragments::render_fragments::Renderer,
 	SHADER_MAP,
 };
 

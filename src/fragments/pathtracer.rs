@@ -1,6 +1,7 @@
 use brainrot::{Shader, ShaderBuilder};
 
-use crate::core::rendering::render_fragments::{PostProcessingPipeline, RenderFragment, Renderer};
+use super::post_processing::PostProcessingPipeline;
+use crate::fragments::render_fragments::{RenderFragment, Renderer};
 
 /*
 --------------------------------------------------------------------------------

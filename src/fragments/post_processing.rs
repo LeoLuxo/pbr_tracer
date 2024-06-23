@@ -1,5 +1,7 @@
-use brainrot::{Shader, ShaderBuilder};
+use brainrot::{path, Shader, ShaderBuilder};
 use velcro::vec;
+
+use super::render_fragments::RenderFragment;
 
 /*
 --------------------------------------------------------------------------------
@@ -7,15 +9,14 @@ use velcro::vec;
 --------------------------------------------------------------------------------
 */
 
-pub trait RenderFragment: Sync + Send {
-	fn shader(&self) -> Shader;
-	fn fragments(&self) -> Vec<&dyn RenderFragment>;
-}
+/// Shader API:\
+/// `fn post_processing_effect(coord: vec2f, color: vec4f) -> vec4f`
+pub trait PostProcessingEffect: RenderFragment {}
 
 /// Shader API:\
 /// `fn post_processing_pipeline(coord: vec2f, color: vec4f) -> vec4f`
 #[derive(Default)]
-pub struct PostProcessingPipeline(Vec<Box<dyn RenderFragment>>);
+pub struct PostProcessingPipeline(Vec<Box<dyn PostProcessingEffect>>);
 
 impl PostProcessingPipeline {
 	pub fn new() -> Self {
@@ -65,10 +66,16 @@ impl RenderFragment for PostProcessingPipeline {
 --------------------------------------------------------------------------------
 */
 
-/// Shader API:\
-/// `fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f`
-pub trait Renderer: RenderFragment {}
+pub struct GammaCorrection;
 
-/// Shader API:\
-/// `fn post_processing_effect(coord: vec2f, color: vec4f) -> vec4f`
-pub trait PostProcessingEffect: RenderFragment {}
+impl PostProcessingEffect for GammaCorrection {}
+
+impl RenderFragment for GammaCorrection {
+	fn shader(&self) -> Shader {
+		path!("/post_processing/gamma.wgsl").into()
+	}
+
+	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+		vec![self]
+	}
+}
