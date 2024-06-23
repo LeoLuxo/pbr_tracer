@@ -8,7 +8,6 @@ use crate::core::rendering::render_fragments::{PostProcessingEffect, RenderFragm
 --------------------------------------------------------------------------------
 */
 
-#[derive(Clone)]
 pub struct GammaCorrection;
 
 impl PostProcessingEffect for GammaCorrection {}

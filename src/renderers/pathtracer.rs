@@ -1,11 +1,6 @@
-use std::iter::{self, Empty};
-
 use brainrot::{Shader, ShaderBuilder};
 
-use crate::core::{
-	gameloop::Render,
-	rendering::render_fragments::{PostProcessingPipeline, RenderFragment, RenderFragmentIter, Renderer},
-};
+use crate::core::rendering::render_fragments::{PostProcessingPipeline, RenderFragment, Renderer};
 
 /*
 --------------------------------------------------------------------------------
@@ -13,7 +8,6 @@ use crate::core::{
 --------------------------------------------------------------------------------
 */
 
-#[derive(Clone)]
 pub struct PhysBasedRaytracer {
 	pub ppp: Option<PostProcessingPipeline>,
 }
@@ -38,15 +32,5 @@ impl RenderFragment for PhysBasedRaytracer {
 		}
 
 		builder.into()
-	}
-}
-
-impl PhysBasedRaytracer {
-	fn sub_fragments(&self) -> RenderFragmentIter {
-		if let Some(ppp) = &self.ppp {
-			iter::once(ppp).into()
-		} else {
-			RenderFragmentIter::empty()
-		}
 	}
 }
