@@ -21,6 +21,7 @@ use brainrot::{bevy::App, include_shader_source_map, size, ShaderSourceMap};
 use fragments::{
 	pathtracer::PhysBasedRaytracer,
 	post_processing::{GammaCorrection, PostProcessingPipeline},
+	tracing::Raymarcher,
 };
 
 /*
@@ -51,7 +52,8 @@ pub fn run() {
 		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(1000, 500),
 			renderer: PhysBasedRaytracer {
-				ppp: Some(PostProcessingPipeline::new().with(GammaCorrection)),
+				tracer: Raymarcher,
+				ppp: PostProcessingPipeline::empty().with(GammaCorrection),
 			},
 			// renderer: DebugRenderer,
 		})

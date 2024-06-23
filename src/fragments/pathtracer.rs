@@ -1,6 +1,7 @@
 use brainrot::{Shader, ShaderBuilder};
+use velcro::vec;
 
-use super::post_processing::PostProcessingPipeline;
+use super::{post_processing::PostProcessingPipeline, tracing::Tracer};
 use crate::fragments::render_fragments::{RenderFragment, Renderer};
 
 /*
@@ -9,37 +10,33 @@ use crate::fragments::render_fragments::{RenderFragment, Renderer};
 --------------------------------------------------------------------------------
 */
 
-pub struct PhysBasedRaytracer {
-	pub ppp: Option<PostProcessingPipeline>,
+pub struct PhysBasedRaytracer<T>
+where
+	T: Tracer,
+{
+	pub tracer: T,
+	pub ppp: PostProcessingPipeline,
 }
 
-impl Renderer for PhysBasedRaytracer {}
+impl<T: Tracer> Renderer for PhysBasedRaytracer<T> {}
 
-impl RenderFragment for PhysBasedRaytracer {
+impl<T: Tracer> RenderFragment for PhysBasedRaytracer<T> {
 	fn shader(&self) -> Shader {
-		let mut builder = ShaderBuilder::new();
-		builder
-			.include_path("pathtracer.wgsl")
-			.include_path("raymarch/raymarch.wgsl");
-
-		// Conditionally include post-processing pipeline
-		if let Some(ppp) = &self.ppp {
-			builder.include(ppp.shader()).define(
+		ShaderBuilder::new()
+			// Base code
+			.include_path("pbrt.wgsl")
+			// Include tracer pipeline
+			.include(self.tracer.shader())
+			// Include post-processing pipeline
+			.include(self.ppp.shader())
+			.define(
 				"CALL_POST_PROCESSING_PIPELINE",
 				"color = post_processing_pipeline(coord, color);",
-			);
-		} else {
-			builder.define("CALL_POST_PROCESSING_PIPELINE", "");
-		}
-
-		builder.into()
+			)
+			.into()
 	}
 
 	fn fragments(&self) -> Vec<&dyn RenderFragment> {
-		if let Some(ppp) = &self.ppp {
-			vec![self, ppp]
-		} else {
-			vec![self]
-		}
+		vec![self, &self.tracer, &self.ppp]
 	}
 }

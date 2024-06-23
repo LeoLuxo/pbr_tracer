@@ -19,7 +19,7 @@ pub trait PostProcessingEffect: RenderFragment {}
 pub struct PostProcessingPipeline(Vec<Box<dyn PostProcessingEffect>>);
 
 impl PostProcessingPipeline {
-	pub fn new() -> Self {
+	pub fn empty() -> Self {
 		Self::default()
 	}
 
