@@ -16,4 +16,8 @@ impl RenderFragment for GammaCorrection {
 	fn shader(&self) -> Shader {
 		path!("/post_processing/gamma.wgsl").into()
 	}
+
+	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+		vec![self]
+	}
 }

@@ -33,4 +33,12 @@ impl RenderFragment for PhysBasedRaytracer {
 
 		builder.into()
 	}
+
+	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+		if let Some(ppp) = &self.ppp {
+			vec![self, ppp]
+		} else {
+			vec![self]
+		}
+	}
 }

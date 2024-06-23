@@ -16,4 +16,8 @@ impl RenderFragment for DebugRenderer {
 	fn shader(&self) -> Shader {
 		path!("/debug.wgsl").into()
 	}
+
+	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+		vec![self]
+	}
 }

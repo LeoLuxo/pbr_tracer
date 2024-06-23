@@ -1,4 +1,5 @@
 use brainrot::{Shader, ShaderBuilder};
+use velcro::vec;
 
 /*
 --------------------------------------------------------------------------------
@@ -8,19 +9,20 @@ use brainrot::{Shader, ShaderBuilder};
 
 pub trait RenderFragment: Sync + Send {
 	fn shader(&self) -> Shader;
+	fn fragments(&self) -> Vec<&dyn RenderFragment>;
 }
 
 /// Shader API:\
 /// `fn post_processing_pipeline(coord: vec2f, color: vec4f) -> vec4f`
 #[derive(Default)]
-pub struct PostProcessingPipeline(Vec<Box<dyn PostProcessingEffect>>);
+pub struct PostProcessingPipeline(Vec<Box<dyn RenderFragment>>);
 
 impl PostProcessingPipeline {
 	pub fn new() -> Self {
 		Self::default()
 	}
 
-	pub fn add_effect(mut self, effect: impl PostProcessingEffect + 'static) -> Self {
+	pub fn with(mut self, effect: impl PostProcessingEffect + 'static) -> Self {
 		self.0.push(Box::new(effect));
 		self
 	}
@@ -47,6 +49,13 @@ impl RenderFragment for PostProcessingPipeline {
 		builder.define("CALL_EFFECTS", pipeline);
 
 		builder.into()
+	}
+
+	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+		vec![
+			self as &dyn RenderFragment,
+			..self.0.iter().flat_map(|v| (**v).fragments()),
+		]
 	}
 }
 

@@ -19,7 +19,7 @@ use core::{
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, include_shader_source_map, size, ShaderSourceMap};
-use renderers::{debug::DebugRenderer, pathtracer::PhysBasedRaytracer, post_processing::GammaCorrection};
+use renderers::{pathtracer::PhysBasedRaytracer, post_processing::GammaCorrection};
 
 /*
 --------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ pub fn run() {
 		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(1000, 500),
 			renderer: PhysBasedRaytracer {
-				ppp: Some(PostProcessingPipeline::new().add_effect(GammaCorrection)),
+				ppp: Some(PostProcessingPipeline::new().with(GammaCorrection)),
 			},
 			// renderer: DebugRenderer,
 		})
