@@ -63,8 +63,13 @@ where
 			.build::<ShaderAssets>(&gpu.device)
 			.expect("Couldn't build shader");
 
-		let compute_renderer =
-			ComputeRenderer::new(gpu, self.resolution, shader, &bind_group_layouts, bind_group_mapping);
+		let compute_renderer = ComputeRenderer::new(
+			gpu,
+			self.resolution,
+			shader.shader_module,
+			&bind_group_layouts,
+			bind_group_mapping,
+		);
 
 		app.world.insert_resource(compute_renderer);
 

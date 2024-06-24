@@ -34,6 +34,121 @@ impl ShaderPath for WindowsPathBuf {}
 impl ShaderPath for Utf8WindowsPath {}
 impl ShaderPath for Utf8WindowsPathBuf {}
 
+#[derive(Clone, Debug, Default, Hash, Eq, PartialEq)]
+pub struct ShaderBuilder {
+	include_directives: LinkedHashSet<Shader>,
+	define_directives: LinkedHashMap<String, String>,
+}
+
+impl ShaderBuilder {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	pub fn include<S>(&mut self, shader: S) -> &mut Self
+	where
+		S: Into<Shader>,
+	{
+		self.include_directives.insert(shader.into());
+		self
+	}
+
+	pub fn include_path<P>(&mut self, path: P) -> &mut Self
+	where
+		P: Into<Utf8UnixPathBuf>,
+	{
+		self.include(Shader::Path(path.into()))
+	}
+
+	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
+	where
+		K: Into<String>,
+		V: Into<String>,
+	{
+		self.define_directives.insert(key.into(), value.into());
+		self
+	}
+
+	pub fn build<Assets: Embed>(&mut self, device: &Device) -> Result<CompiledShader> {
+		let source = self.build_source::<Assets>()?;
+
+		let shader_module = device.create_shader_module(ShaderModuleDescriptor {
+			label: None,
+			source: ShaderSource::Wgsl(<Cow<str>>::from(source)),
+		});
+
+		Ok(CompiledShader { shader_module })
+	}
+
+	fn build_source<Assets: Embed>(&mut self) -> Result<String> {
+		let mut builder = mem::take(self);
+
+		let mut include_blacklist = HashSet::new();
+
+		let mut source = String::new();
+
+		for shader in builder.include_directives.drain() {
+			let included_source = shader.process_source::<Assets>(&mut include_blacklist)?;
+			source.push_str(&included_source);
+		}
+
+		builder
+			.define_directives
+			.extend(Self::process_define_directives(&mut source));
+		source = builder.apply_define_directives(source);
+
+		Ok(source)
+	}
+
+	fn process_define_directives(source: &mut String) -> LinkedHashMap<String, String> {
+		let mut define_directives = LinkedHashMap::<String, String>::new();
+
+		// Find all `#define KEY value` in the source
+		let re = Regex::new(r#"(?m)^#define (.+?) (.+?)$"#).unwrap();
+
+		let mut ranges = Vec::<Range<usize>>::new();
+		for caps in re.captures_iter(source) {
+			// The bytes that the `#define ...` statement occupies
+			let range = caps.get(0).unwrap().range();
+			ranges.push(range);
+
+			let key = caps.get(1).unwrap().as_str().to_owned();
+			let value = caps.get(2).unwrap().as_str().to_owned();
+			define_directives.insert(key, value);
+		}
+
+		// Delete the directives from the source string
+		let mut offset: isize = 0;
+		for range in ranges {
+			let range = (range.start as isize + offset) as usize..(range.end as isize + offset) as usize;
+
+			// Decrease offset since we're deleting sections of text
+			offset -= range.len() as isize;
+
+			source.replace_range(range, "");
+		}
+
+		define_directives
+	}
+
+	fn apply_define_directives(&mut self, mut source: String) -> String {
+		let mut directives = self.define_directives.iter().collect::<Vec<_>>();
+		// Sort by reverse size, so from biggest key to smallest key
+		directives.sort_by(|(key1, _), (key2, _)| key2.cmp(key1));
+
+		for (key, value) in directives {
+			source = source.replace(key, value);
+		}
+		source
+	}
+}
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
 #[derive(Hash, Debug, Clone, Eq, PartialEq)]
 pub enum Shader {
 	Source(String),
@@ -183,111 +298,12 @@ impl From<&mut ShaderBuilder> for Shader {
 	}
 }
 
-#[derive(Clone, Debug, Default, Hash, Eq, PartialEq)]
-pub struct ShaderBuilder {
-	include_directives: LinkedHashSet<Shader>,
-	define_directives: LinkedHashMap<String, String>,
-}
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
 
-impl ShaderBuilder {
-	pub fn new() -> Self {
-		Self::default()
-	}
-
-	pub fn include<S>(&mut self, shader: S) -> &mut Self
-	where
-		S: Into<Shader>,
-	{
-		self.include_directives.insert(shader.into());
-		self
-	}
-
-	pub fn include_path<P>(&mut self, path: P) -> &mut Self
-	where
-		P: Into<Utf8UnixPathBuf>,
-	{
-		self.include(Shader::Path(path.into()))
-	}
-
-	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
-	where
-		K: Into<String>,
-		V: Into<String>,
-	{
-		self.define_directives.insert(key.into(), value.into());
-		self
-	}
-
-	pub fn build<Assets: Embed>(&mut self, device: &Device) -> Result<ShaderModule> {
-		let source = self.build_source::<Assets>()?;
-
-		let shader_module = device.create_shader_module(ShaderModuleDescriptor {
-			label: None,
-			source: ShaderSource::Wgsl(<Cow<str>>::from(source)),
-		});
-
-		Ok(shader_module)
-	}
-
-	pub fn build_source<Assets: Embed>(&mut self) -> Result<String> {
-		let mut builder = mem::take(self);
-
-		let mut include_blacklist = HashSet::new();
-
-		let mut source = String::new();
-
-		for shader in builder.include_directives.drain() {
-			let included_source = shader.process_source::<Assets>(&mut include_blacklist)?;
-			source.push_str(&included_source);
-		}
-
-		builder
-			.define_directives
-			.extend(Self::process_define_directives(&mut source));
-		source = builder.apply_define_directives(source);
-
-		Ok(source)
-	}
-
-	fn process_define_directives(source: &mut String) -> LinkedHashMap<String, String> {
-		let mut define_directives = LinkedHashMap::<String, String>::new();
-
-		// Find all `#define KEY value` in the source
-		let re = Regex::new(r#"(?m)^#define (.+?) (.+?)$"#).unwrap();
-
-		let mut ranges = Vec::<Range<usize>>::new();
-		for caps in re.captures_iter(source) {
-			// The bytes that the `#define ...` statement occupies
-			let range = caps.get(0).unwrap().range();
-			ranges.push(range);
-
-			let key = caps.get(1).unwrap().as_str().to_owned();
-			let value = caps.get(2).unwrap().as_str().to_owned();
-			define_directives.insert(key, value);
-		}
-
-		// Delete the directives from the source string
-		let mut offset: isize = 0;
-		for range in ranges {
-			let range = (range.start as isize + offset) as usize..(range.end as isize + offset) as usize;
-
-			// Decrease offset since we're deleting sections of text
-			offset -= range.len() as isize;
-
-			source.replace_range(range, "");
-		}
-
-		define_directives
-	}
-
-	fn apply_define_directives(&mut self, mut source: String) -> String {
-		let mut directives = self.define_directives.iter().collect::<Vec<_>>();
-		// Sort by reverse size, so from biggest key to smallest key
-		directives.sort_by(|(key1, _), (key2, _)| key2.cmp(key1));
-
-		for (key, value) in directives {
-			source = source.replace(key, value);
-		}
-		source
-	}
+struct CompiledShader {
+	pub shader_module: ShaderModule,
 }
