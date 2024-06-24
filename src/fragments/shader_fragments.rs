@@ -1,4 +1,5 @@
-use brainrot::Shader;
+
+use crate::core::shader::{Shader, ShaderBuilder};
 
 use crate::core::buffer::BufferRegistrar;
 

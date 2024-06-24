@@ -5,7 +5,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	ScreenSize, ShaderBuilder,
+	ScreenSize,
 };
 use velcro::vec;
 use wgpu::{
@@ -26,8 +26,9 @@ use crate::{
 		gameloop::{Render, Update},
 		gpu::Gpu,
 		render_target::RenderTarget,
+		shader::{Shader, ShaderBuilder},
 	},
-	SHADER_MAP,
+	ShaderAssets,
 };
 
 /*
@@ -102,7 +103,7 @@ impl CompositeRenderer {
 		// 	.create_shader_module(include_wgsl!(src!("shader/composite.wgsl")));
 		let shader = ShaderBuilder::new()
 			.include_path("composite.wgsl")
-			.build(&SHADER_MAP, &gpu.device)
+			.build::<ShaderAssets>(&gpu.device)
 			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.
@@ -270,9 +271,9 @@ fn render(
 		render_pass.set_bind_group(1, &q.single().bind_group, &[]);
 
 		// Draw 2 fullscreen triangles
-		// 1 -- 2
-		// | /  |
-		// 3 -- 4
+		// 2 - 3
+		// | \ |
+		// 0 - 1
 		render_pass.draw(0..4, 0..1);
 	}
 	// Extra scope here to make sure render_pass is dropped, otherwise

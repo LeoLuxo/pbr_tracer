@@ -1,7 +1,10 @@
-use brainrot::{bevy, path, Shader};
+use brainrot::{bevy, path};
 
 use super::shader_fragments::ShaderFragment;
-use crate::core::buffer::BufferRegistrar;
+use crate::core::{
+	buffer::BufferRegistrar,
+	shader::{Shader, ShaderBuilder},
+};
 
 /*
 --------------------------------------------------------------------------------

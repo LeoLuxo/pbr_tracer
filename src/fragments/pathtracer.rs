@@ -1,8 +1,10 @@
-use brainrot::{Shader, ShaderBuilder};
 use velcro::vec;
 
 use super::{intersector::Intersector, post_processing::PostProcessingPipeline};
-use crate::fragments::shader_fragments::{Renderer, ShaderFragment};
+use crate::{
+	core::shader::{Shader, ShaderBuilder},
+	fragments::shader_fragments::{Renderer, ShaderFragment},
+};
 
 /*
 --------------------------------------------------------------------------------

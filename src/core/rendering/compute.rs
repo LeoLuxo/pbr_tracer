@@ -4,7 +4,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	ScreenSize, ShaderBuilder, TextureAsset,
+	ScreenSize, TextureAsset,
 };
 use velcro::vec;
 use wgpu::{
@@ -19,9 +19,10 @@ use crate::{
 		gameloop::Render,
 		gpu::Gpu,
 		render_target::RenderTarget,
+		shader::{Shader, ShaderBuilder},
 	},
 	fragments::shader_fragments::Renderer,
-	SHADER_MAP,
+	ShaderAssets,
 };
 
 /*
@@ -59,7 +60,7 @@ where
 		let shader = ShaderBuilder::new()
 			.include_path("compute.wgsl")
 			.include(self.renderer.shader())
-			.build(&SHADER_MAP, &gpu.device)
+			.build::<ShaderAssets>(&gpu.device)
 			.expect("Couldn't build shader");
 
 		let compute_renderer =

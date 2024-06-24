@@ -22,8 +22,15 @@ wgpu  = "=0.19.1"
 winit = { version = "=0.29.4", features = ["rwh_05"] }
 
 
-bytemuck   = { version = "1.15.0", features = ["derive", "min_const_generics"] }
-env_logger = "0.11"
-log        = "0.4"
-pollster   = "0.3.0"
-velcro     = "0.5.4"
+anyhow       = "1.0.86"
+bytemuck     = { version = "1.15.0", features = ["derive", "min_const_generics"] }
+env_logger   = "0.11"
+hashlink     = "0.9.1"
+log          = "0.4"
+pollster     = "0.3.0"
+rand         = "0.8.5"
+regex        = "1.10.5"
+replace_with = "0.1.7"
+rust-embed   = { version = "8.4.0", features = ["compression", "include-exclude", "interpolate-folder-path"] }
+typed-path   = "0.9.0"
+velcro       = "0.5.4"

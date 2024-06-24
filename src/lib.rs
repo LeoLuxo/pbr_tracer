@@ -17,12 +17,13 @@ use core::{
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::{bevy::App, include_shader_source_map, size, ShaderSourceMap};
+use brainrot::{bevy::App, size};
 use fragments::{
 	intersector::Raymarcher,
 	pathtracer::PhysBasedRaytracer,
 	post_processing::{GammaCorrection, PostProcessingPipeline},
 };
+use rust_embed::Embed;
 
 /*
 --------------------------------------------------------------------------------
@@ -30,7 +31,10 @@ use fragments::{
 --------------------------------------------------------------------------------
 */
 
-const SHADER_MAP: ShaderSourceMap = include_shader_source_map!();
+#[derive(Embed)]
+#[folder = "src/shader/"]
+#[prefix = "/"]
+struct ShaderAssets;
 
 pub trait EntityLabel {}
 
