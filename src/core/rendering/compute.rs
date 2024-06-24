@@ -19,7 +19,7 @@ use crate::{
 		gameloop::Render,
 		gpu::Gpu,
 		render_target::RenderTarget,
-		shader::{Shader, ShaderBuilder},
+		shader::ShaderBuilder,
 	},
 	fragments::shader_fragments::Renderer,
 	ShaderAssets,

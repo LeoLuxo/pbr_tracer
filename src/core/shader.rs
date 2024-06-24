@@ -1,28 +1,17 @@
-use std::{
-	borrow::Cow,
-	collections::{HashMap, HashSet},
-	fmt::format,
-	fs::read_to_string,
-	hash::{DefaultHasher, Hash, Hasher},
-	marker::PhantomData,
-	mem,
-	ops::{Deref, Range},
-	path::PathBuf,
-	str::FromStr,
-};
+use std::{borrow::Cow, collections::HashSet, hash::Hash, mem, ops::Range};
 
 use anyhow::{anyhow, Ok, Result};
 use brainrot::{path, root, rooted_path};
 use hashlink::{LinkedHashMap, LinkedHashSet};
-use rand::{distributions, seq::IteratorRandom, Rng};
+use rand::seq::IteratorRandom;
 use regex::Regex;
-use replace_with::{replace_with, replace_with_or_abort};
+use replace_with::replace_with_or_abort;
 use rust_embed::Embed;
 use typed_path::{
-	TypedPath, TypedPathBuf, UnixPath, UnixPathBuf, Utf8Path, Utf8TypedPath, Utf8TypedPathBuf, Utf8UnixPath,
-	Utf8UnixPathBuf, Utf8WindowsPath, Utf8WindowsPathBuf, WindowsPath, WindowsPathBuf,
+	TypedPath, TypedPathBuf, UnixPath, UnixPathBuf, Utf8TypedPath, Utf8TypedPathBuf, Utf8UnixPath, Utf8UnixPathBuf,
+	Utf8WindowsPath, Utf8WindowsPathBuf, WindowsPath, WindowsPathBuf,
 };
-use velcro::{iter, vec};
+use velcro::iter;
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderSource};
 
 /*

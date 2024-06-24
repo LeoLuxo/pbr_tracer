@@ -1,8 +1,8 @@
-use brainrot::{path};
+use brainrot::path;
 use velcro::vec;
-use crate::core::shader::{Shader, ShaderBuilder};
 
 use super::shader_fragments::ShaderFragment;
+use crate::core::shader::{Shader, ShaderBuilder};
 
 /*
 --------------------------------------------------------------------------------

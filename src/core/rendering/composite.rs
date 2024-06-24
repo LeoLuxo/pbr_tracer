@@ -26,7 +26,7 @@ use crate::{
 		gameloop::{Render, Update},
 		gpu::Gpu,
 		render_target::RenderTarget,
-		shader::{Shader, ShaderBuilder},
+		shader::ShaderBuilder,
 	},
 	ShaderAssets,
 };

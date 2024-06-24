@@ -1,7 +1,4 @@
-
-use crate::core::shader::{Shader, ShaderBuilder};
-
-use crate::core::buffer::BufferRegistrar;
+use crate::core::{buffer::BufferRegistrar, shader::Shader};
 
 /*
 --------------------------------------------------------------------------------
