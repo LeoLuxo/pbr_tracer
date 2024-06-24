@@ -122,7 +122,7 @@ impl<'a> BufferRegistrar<'a> {
 		}
 	}
 
-	fn add_uniform_buffer<T>(&mut self, data: T)
+	pub fn add_uniform_buffer<T>(&mut self, data: T)
 	where
 		T: bytemuck::Pod + bevy::Component + Send + Sync,
 	{

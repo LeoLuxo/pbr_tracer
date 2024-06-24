@@ -1,29 +1,35 @@
 
-#define EPSILON 0.00001
-#define MIN_MARCH 0.1
-#define MAX_MARCH 1000.0
-#define MAX_MARCH_STEPS 1024
 
 #include "primitives.wgsl"
 
+
+struct RaymarchSettings {
+	epsilon: f32,
+	min_march: f32,
+	max_march: f32,
+	max_march_steps: u32,
+};
+@group(1) @binding(0) var<uniform> settings: RaymarchSettings;
+
+
 fn send_ray(ray_origin: vec3f, ray_dir: vec3f) -> vec4f {
 	var iters: u32;
-	var t = MIN_MARCH;
+	var t = settings.min_march;
 	
-	for (iters = 0u; iters < MAX_MARCH_STEPS && t < MAX_MARCH; iters++) {
+	for (iters = 0u; iters < settings.max_march_steps && t < settings.max_march; iters++) {
 		let p = ray_origin + ray_dir * t;
 		let distance = sdf(p);
 		
-		if (distance < EPSILON) {break;}
+		if (distance < settings.epsilon) {break;}
 		
 		t += distance;
 	}
 	
-	if (t >= MAX_MARCH) {
+	if (t >= settings.max_march) {
 		t = -1.0;
 	}
 	
-	var color = vec4f(vec3f(f32(iters) / f32(MAX_MARCH_STEPS)), 1);
+	var color = vec4f(vec3f(f32(iters) / f32(settings.max_march_steps)), 1);
 	
 	return color;
 }

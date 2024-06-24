@@ -40,6 +40,8 @@ where
 	R: Renderer + 'static,
 {
 	fn build(&self, app: &mut App) {
+		// TODO refactor the bufer stuff somehow
+		// Maybe declarative?
 		let fragments = self.renderer.fragments();
 		let mut buffers = BufferRegistrar::new(app, 1, ShaderStages::COMPUTE);
 

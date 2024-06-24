@@ -1,7 +1,7 @@
 use brainrot::{Shader, ShaderBuilder};
 use velcro::vec;
 
-use super::{post_processing::PostProcessingPipeline, tracing::Tracer};
+use super::{intersector::Intersector, post_processing::PostProcessingPipeline};
 use crate::fragments::shader_fragments::{Renderer, ShaderFragment};
 
 /*
@@ -12,21 +12,20 @@ use crate::fragments::shader_fragments::{Renderer, ShaderFragment};
 
 pub struct PhysBasedRaytracer<T>
 where
-	T: Tracer,
+	T: Intersector,
 {
-	pub tracer: T,
+	pub intersector: T,
 	pub ppp: PostProcessingPipeline,
 }
 
-impl<T: Tracer> Renderer for PhysBasedRaytracer<T> {}
-
-impl<T: Tracer> ShaderFragment for PhysBasedRaytracer<T> {
+impl<T: Intersector> Renderer for PhysBasedRaytracer<T> {}
+impl<T: Intersector> ShaderFragment for PhysBasedRaytracer<T> {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
 			// Base code
 			.include_path("pbrt.wgsl")
 			// Include tracer pipeline
-			.include(self.tracer.shader())
+			.include(self.intersector.shader())
 			// Include post-processing pipeline
 			.include(self.ppp.shader())
 			.define(
@@ -37,6 +36,6 @@ impl<T: Tracer> ShaderFragment for PhysBasedRaytracer<T> {
 	}
 
 	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
-		vec![self, &self.tracer, &self.ppp]
+		vec![self, &self.intersector, &self.ppp]
 	}
 }

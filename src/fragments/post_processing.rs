@@ -69,7 +69,6 @@ impl ShaderFragment for PostProcessingPipeline {
 pub struct GammaCorrection;
 
 impl PostProcessingEffect for GammaCorrection {}
-
 impl ShaderFragment for GammaCorrection {
 	fn shader(&self) -> Shader {
 		path!("/post_processing/gamma.wgsl").into()

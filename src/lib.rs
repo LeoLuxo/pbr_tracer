@@ -19,9 +19,9 @@ use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, include_shader_source_map, size, ShaderSourceMap};
 use fragments::{
+	intersector::Raymarcher,
 	pathtracer::PhysBasedRaytracer,
 	post_processing::{GammaCorrection, PostProcessingPipeline},
-	tracing::Raymarcher,
 };
 
 /*
@@ -52,7 +52,7 @@ pub fn run() {
 		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(1000, 500),
 			renderer: PhysBasedRaytracer {
-				tracer: Raymarcher,
+				intersector: Raymarcher,
 				ppp: PostProcessingPipeline::empty().with(GammaCorrection),
 			},
 			// renderer: DebugRenderer,

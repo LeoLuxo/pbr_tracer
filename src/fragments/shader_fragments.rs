@@ -11,7 +11,7 @@ use crate::core::buffer::BufferRegistrar;
 pub trait ShaderFragment: Sync + Send {
 	fn shader(&self) -> Shader;
 	fn fragments(&self) -> Vec<&dyn ShaderFragment>;
-	fn declare_buffers(&self, buffers: &mut BufferRegistrar) {}
+	fn declare_buffers(&self, _buffers: &mut BufferRegistrar) {}
 }
 
 /// Shader API:\
