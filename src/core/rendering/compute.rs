@@ -6,14 +6,15 @@ use brainrot::{
 	bevy::{self, App, Plugin},
 	ScreenSize, ShaderBuilder, TextureAsset,
 };
+use velcro::vec;
 use wgpu::{
-	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+	BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
 	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
-	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
+	ShaderModule, ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
 };
 
 use crate::{
-	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
+	core::{buffer::BufferRegistrar, gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	fragments::shader_fragments::Renderer,
 	SHADER_MAP,
 };
@@ -29,6 +30,9 @@ pub struct ComputeRendererPlugin<R: Renderer> {
 	pub renderer: R,
 }
 
+#[derive(bevy::Component, Copy, Clone)]
+struct ComputeBufferLabel;
+
 impl<R> Plugin for ComputeRendererPlugin<R>
 where
 	R: Renderer + 'static,
@@ -36,7 +40,21 @@ where
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
-		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, &self.renderer);
+		// Dynamically create shader from the renderer
+		let shader = ShaderBuilder::new()
+			.include_path("compute.wgsl")
+			.include(self.renderer.shader())
+			.build(&SHADER_MAP, &gpu.device)
+			.expect("Couldn't build shader");
+
+		let fragments = self.renderer.fragments();
+		let mut buffers = BufferRegistrar::new(app, 1, ShaderStages::COMPUTE);
+
+		for fragment in fragments {
+			fragment.declare_buffers(&mut buffers);
+		}
+
+		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, shader, &buffers.bind_group_layouts());
 
 		app.world.insert_resource(compute_renderer);
 
@@ -60,14 +78,12 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new<R: Renderer>(gpu: &Gpu, resolution: ScreenSize, renderer: &R) -> Self {
-		// Dynamically create shader from the renderer
-		let shader = ShaderBuilder::new()
-			.include_path("compute.wgsl")
-			.include(renderer.shader())
-			.build(&SHADER_MAP, &gpu.device)
-			.expect("Couldn't build shader");
-
+	pub fn new(
+		gpu: &Gpu,
+		resolution: ScreenSize,
+		shader: ShaderModule,
+		additional_layouts: &[&BindGroupLayout],
+	) -> Self {
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
@@ -77,7 +93,7 @@ impl ComputeRenderer {
 			Some("Output texture"),
 		);
 
-		let bind_group_layout = gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+		let texture_bind_grounp_layout = gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
 			label: Some("Compute Bind Group Layout"),
 			entries: &[BindGroupLayoutEntry {
 				binding: 0,
@@ -91,9 +107,11 @@ impl ComputeRenderer {
 			}],
 		});
 
+		let bind_group_layouts = &vec![&texture_bind_grounp_layout, ..additional_layouts];
+
 		let pipeline_layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("Compute Pipeline Layout"),
-			bind_group_layouts: &[&bind_group_layout],
+			bind_group_layouts,
 			push_constant_ranges: &[],
 		});
 

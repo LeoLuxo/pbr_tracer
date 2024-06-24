@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, mem};
+use std::{marker::PhantomData, mem, sync::Arc};
 
 use bevy_ecs::system::{Query, Res};
 use brainrot::bevy::{self, App};
@@ -21,8 +21,8 @@ where
 	T: Sized + bytemuck::Pod,
 {
 	pub buffer: Buffer,
-	pub bind_group_layout: BindGroupLayout,
-	pub bind_group: BindGroup,
+	pub bind_group_layout: Arc<BindGroupLayout>,
+	pub bind_group: Arc<BindGroup>,
 	_marker: PhantomData<T>,
 }
 
@@ -65,11 +65,73 @@ where
 
 		UniformBuffer::<T> {
 			buffer,
-			bind_group_layout,
-			bind_group,
+			bind_group_layout: Arc::new(bind_group_layout),
+			bind_group: Arc::new(bind_group),
 			_marker: Default::default(),
 		}
 	}
+}
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+#[derive(bevy::Bundle)]
+pub struct BufferBundle<T>
+where
+	T: bevy::Component + bytemuck::Pod,
+{
+	data: T,
+	buffer: UniformBuffer<T>,
+}
+
+pub struct BufferRegistrar<'a> {
+	app: &'a mut App,
+	device: &'a Device,
+	shader_stages: ShaderStages,
+	bind_group_offset: u32,
+	bind_group_layouts: Vec<Arc<BindGroupLayout>>,
+	bind_groups: Vec<Arc<BindGroup>>,
+}
+
+impl<'a> BufferRegistrar<'a> {
+	pub fn new(app: &'a mut App, device: &'a mut Device, bind_group_offset: u32, shader_stages: ShaderStages) -> Self {
+		Self {
+			app,
+			device,
+			bind_group_offset,
+			shader_stages,
+			bind_group_layouts: Vec::new(),
+			bind_groups: Vec::new(),
+		}
+	}
+
+	fn add_uniform_buffer<T>(&mut self, data: T)
+	where
+		T: bytemuck::Pod + bevy::Component + Send + Sync,
+	{
+		register_uniform::<T>(self.app);
+
+		let buffer = UniformBuffer::<T>::new(self.device, std::any::type_name::<T>(), self.shader_stages);
+
+		self.bind_group_layouts.push(buffer.bind_group_layout.clone());
+
+		let buffer_bundle = BufferBundle { data, buffer };
+
+		self.app.world.spawn(buffer_bundle);
+	}
+
+	pub fn bind_group_layouts(&'a self) -> Vec<&'a BindGroupLayout> {
+		self.bind_group_layouts.iter().map(|v| v.as_ref()).collect()
+	}
+
+	pub fn bind_groups(&'a self) -> Vec<&'a BindGroup> {
+		self.bind_groups.iter().map(|v| v.as_ref()).collect()
+	}
+
+	pub fn finish<L>(self, label: L) {}
 }
 
 /*
