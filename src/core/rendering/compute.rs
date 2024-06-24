@@ -14,7 +14,12 @@ use wgpu::{
 };
 
 use crate::{
-	core::{buffer::BufferRegistrar, gameloop::Render, gpu::Gpu, render_target::RenderTarget},
+	core::{
+		buffer::{BindGroupMapping, BufferRegistrar},
+		gameloop::Render,
+		gpu::Gpu,
+		render_target::RenderTarget,
+	},
 	fragments::shader_fragments::Renderer,
 	SHADER_MAP,
 };
@@ -30,14 +35,22 @@ pub struct ComputeRendererPlugin<R: Renderer> {
 	pub renderer: R,
 }
 
-#[derive(bevy::Component, Copy, Clone)]
-struct ComputeBufferLabel;
-
 impl<R> Plugin for ComputeRendererPlugin<R>
 where
 	R: Renderer + 'static,
 {
 	fn build(&self, app: &mut App) {
+		let fragments = self.renderer.fragments();
+		let mut buffers = BufferRegistrar::new(app, 1, ShaderStages::COMPUTE);
+
+		for fragment in fragments {
+			fragment.declare_buffers(&mut buffers);
+		}
+
+		let bind_group_layouts = buffers.bind_group_layouts();
+		let bind_group_layouts = bind_group_layouts.iter().map(|v| v.as_ref()).collect::<Vec<_>>();
+		let bind_group_mapping = buffers.bind_group_mapping();
+
 		let gpu = app.world.resource::<Gpu>();
 
 		// Dynamically create shader from the renderer
@@ -47,14 +60,8 @@ where
 			.build(&SHADER_MAP, &gpu.device)
 			.expect("Couldn't build shader");
 
-		let fragments = self.renderer.fragments();
-		let mut buffers = BufferRegistrar::new(app, 1, ShaderStages::COMPUTE);
-
-		for fragment in fragments {
-			fragment.declare_buffers(&mut buffers);
-		}
-
-		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, shader, &buffers.bind_group_layouts());
+		let compute_renderer =
+			ComputeRenderer::new(gpu, self.resolution, shader, &bind_group_layouts, bind_group_mapping);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -75,6 +82,7 @@ pub struct ComputeRenderPass;
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
 	pub output_texture: TextureAsset,
+	pub bind_group_mapping: BindGroupMapping,
 }
 
 impl ComputeRenderer {
@@ -83,6 +91,7 @@ impl ComputeRenderer {
 		resolution: ScreenSize,
 		shader: ShaderModule,
 		additional_layouts: &[&BindGroupLayout],
+		bind_group_mapping: BindGroupMapping,
 	) -> Self {
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
@@ -125,6 +134,7 @@ impl ComputeRenderer {
 		Self {
 			pipeline,
 			output_texture,
+			bind_group_mapping,
 		}
 	}
 }
@@ -161,6 +171,9 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 		compute_pass.set_pipeline(&compute_renderer.pipeline);
 
 		compute_pass.set_bind_group(0, &compute_bind_group, &[]);
+		compute_renderer
+			.bind_group_mapping
+			.apply_to_compute_pass(&mut compute_pass);
 
 		compute_pass.dispatch_workgroups(out_width, out_height, 1);
 	}

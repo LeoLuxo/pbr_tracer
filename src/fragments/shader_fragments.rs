@@ -1,10 +1,6 @@
-use brainrot::{
-	bevy::{self, App},
-	Shader,
-};
-use wgpu::{Device, ShaderStages};
+use brainrot::Shader;
 
-use crate::core::buffer::{self, BufferRegistrar, UniformBuffer};
+use crate::core::buffer::BufferRegistrar;
 
 /*
 --------------------------------------------------------------------------------

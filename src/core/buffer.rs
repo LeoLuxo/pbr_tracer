@@ -1,10 +1,11 @@
-use std::{marker::PhantomData, mem, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData, mem, sync::Arc};
 
 use bevy_ecs::system::{Query, Res};
 use brainrot::bevy::{self, App};
 use wgpu::{
-	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, Device, ShaderStages,
+	util::RenderEncoder, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
+	BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ComputePass, Device,
+	RenderPass, ShaderStages,
 };
 
 use super::{gameloop::PreRender, gpu::Gpu};
@@ -87,9 +88,23 @@ where
 	buffer: UniformBuffer<T>,
 }
 
+pub struct BindGroupMapping(HashMap<u32, Arc<BindGroup>>);
+
+impl<'a> BindGroupMapping {
+	pub fn apply_to_render_pass(&'a self, render_pass: &'a mut RenderPass<'a>) {
+		for (index, bind_group) in &self.0 {
+			render_pass.set_bind_group(*index, bind_group.as_ref(), &[]);
+		}
+	}
+	pub fn apply_to_compute_pass(&'a self, compute_pass: &mut ComputePass<'a>) {
+		for (index, bind_group) in &self.0 {
+			compute_pass.set_bind_group(*index, bind_group.as_ref(), &[]);
+		}
+	}
+}
+
 pub struct BufferRegistrar<'a> {
 	app: &'a mut App,
-	device: &'a Device,
 	shader_stages: ShaderStages,
 	bind_group_offset: u32,
 	bind_group_layouts: Vec<Arc<BindGroupLayout>>,
@@ -97,10 +112,9 @@ pub struct BufferRegistrar<'a> {
 }
 
 impl<'a> BufferRegistrar<'a> {
-	pub fn new(app: &'a mut App, device: &'a mut Device, bind_group_offset: u32, shader_stages: ShaderStages) -> Self {
+	pub fn new(app: &'a mut App, bind_group_offset: u32, shader_stages: ShaderStages) -> Self {
 		Self {
 			app,
-			device,
 			bind_group_offset,
 			shader_stages,
 			bind_group_layouts: Vec::new(),
@@ -114,7 +128,8 @@ impl<'a> BufferRegistrar<'a> {
 	{
 		register_uniform::<T>(self.app);
 
-		let buffer = UniformBuffer::<T>::new(self.device, std::any::type_name::<T>(), self.shader_stages);
+		let device = &self.app.world.resource::<Gpu>().device;
+		let buffer = UniformBuffer::<T>::new(device, std::any::type_name::<T>(), self.shader_stages);
 
 		self.bind_group_layouts.push(buffer.bind_group_layout.clone());
 
@@ -123,15 +138,23 @@ impl<'a> BufferRegistrar<'a> {
 		self.app.world.spawn(buffer_bundle);
 	}
 
-	pub fn bind_group_layouts(&'a self) -> Vec<&'a BindGroupLayout> {
-		self.bind_group_layouts.iter().map(|v| v.as_ref()).collect()
+	pub fn bind_group_layouts(&'a self) -> Vec<Arc<BindGroupLayout>> {
+		self.bind_group_layouts.clone()
 	}
 
-	pub fn bind_groups(&'a self) -> Vec<&'a BindGroup> {
-		self.bind_groups.iter().map(|v| v.as_ref()).collect()
+	pub fn bind_groups(&'a self) -> Vec<Arc<BindGroup>> {
+		self.bind_groups.clone()
 	}
 
-	pub fn finish<L>(self, label: L) {}
+	pub fn bind_group_mapping(&self) -> BindGroupMapping {
+		BindGroupMapping(
+			self.bind_groups
+				.iter()
+				.zip(0u32..)
+				.map(|(v, i)| (i + self.bind_group_offset, v.clone()))
+				.collect(),
+		)
+	}
 }
 
 /*
