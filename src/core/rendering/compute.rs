@@ -14,7 +14,7 @@ use wgpu::{
 
 use crate::{
 	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
-	fragments::render_fragments::Renderer,
+	fragments::shader_fragments::Renderer,
 	SHADER_MAP,
 };
 

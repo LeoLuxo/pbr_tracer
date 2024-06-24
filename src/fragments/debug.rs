@@ -1,6 +1,6 @@
 use brainrot::{path, Shader};
 
-use super::render_fragments::{RenderFragment, Renderer};
+use super::shader_fragments::{Renderer, ShaderFragment};
 
 /*
 --------------------------------------------------------------------------------
@@ -12,12 +12,12 @@ pub struct DebugRenderer;
 
 impl Renderer for DebugRenderer {}
 
-impl RenderFragment for DebugRenderer {
+impl ShaderFragment for DebugRenderer {
 	fn shader(&self) -> Shader {
 		path!("/debug.wgsl").into()
 	}
 
-	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
 		vec![self]
 	}
 }

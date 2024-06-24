@@ -1,7 +1,7 @@
 use brainrot::{path, Shader, ShaderBuilder};
 use velcro::vec;
 
-use super::render_fragments::RenderFragment;
+use super::shader_fragments::ShaderFragment;
 
 /*
 --------------------------------------------------------------------------------
@@ -11,7 +11,7 @@ use super::render_fragments::RenderFragment;
 
 /// Shader API:\
 /// `fn post_processing_effect(coord: vec2f, color: vec4f) -> vec4f`
-pub trait PostProcessingEffect: RenderFragment {}
+pub trait PostProcessingEffect: ShaderFragment {}
 
 /// Shader API:\
 /// `fn post_processing_pipeline(coord: vec2f, color: vec4f) -> vec4f`
@@ -29,7 +29,7 @@ impl PostProcessingPipeline {
 	}
 }
 
-impl RenderFragment for PostProcessingPipeline {
+impl ShaderFragment for PostProcessingPipeline {
 	fn shader(&self) -> Shader {
 		// Set up the pipeline function
 		let mut builder = ShaderBuilder::new();
@@ -52,9 +52,9 @@ impl RenderFragment for PostProcessingPipeline {
 		builder.into()
 	}
 
-	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
 		vec![
-			self as &dyn RenderFragment,
+			self as &dyn ShaderFragment,
 			..self.0.iter().flat_map(|v| (**v).fragments()),
 		]
 	}
@@ -70,12 +70,12 @@ pub struct GammaCorrection;
 
 impl PostProcessingEffect for GammaCorrection {}
 
-impl RenderFragment for GammaCorrection {
+impl ShaderFragment for GammaCorrection {
 	fn shader(&self) -> Shader {
 		path!("/post_processing/gamma.wgsl").into()
 	}
 
-	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
 		vec![self]
 	}
 }

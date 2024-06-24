@@ -2,7 +2,7 @@ use brainrot::{Shader, ShaderBuilder};
 use velcro::vec;
 
 use super::{post_processing::PostProcessingPipeline, tracing::Tracer};
-use crate::fragments::render_fragments::{RenderFragment, Renderer};
+use crate::fragments::shader_fragments::{Renderer, ShaderFragment};
 
 /*
 --------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ where
 
 impl<T: Tracer> Renderer for PhysBasedRaytracer<T> {}
 
-impl<T: Tracer> RenderFragment for PhysBasedRaytracer<T> {
+impl<T: Tracer> ShaderFragment for PhysBasedRaytracer<T> {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
 			// Base code
@@ -36,7 +36,7 @@ impl<T: Tracer> RenderFragment for PhysBasedRaytracer<T> {
 			.into()
 	}
 
-	fn fragments(&self) -> Vec<&dyn RenderFragment> {
+	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
 		vec![self, &self.tracer, &self.ppp]
 	}
 }
