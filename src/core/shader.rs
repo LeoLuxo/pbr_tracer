@@ -20,20 +20,6 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderSource};
 --------------------------------------------------------------------------------
 */
 
-trait ShaderPath {}
-impl ShaderPath for TypedPath<'_> {}
-impl ShaderPath for TypedPathBuf {}
-impl ShaderPath for Utf8TypedPath<'_> {}
-impl ShaderPath for Utf8TypedPathBuf {}
-impl ShaderPath for UnixPath {}
-impl ShaderPath for UnixPathBuf {}
-impl ShaderPath for Utf8UnixPath {}
-impl ShaderPath for Utf8UnixPathBuf {}
-impl ShaderPath for WindowsPath {}
-impl ShaderPath for WindowsPathBuf {}
-impl ShaderPath for Utf8WindowsPath {}
-impl ShaderPath for Utf8WindowsPathBuf {}
-
 #[derive(Clone, Debug, Default, Hash, Eq, PartialEq)]
 pub struct ShaderBuilder {
 	include_directives: LinkedHashSet<Shader>,
@@ -262,39 +248,72 @@ impl Shader {
 	}
 }
 
-impl From<String> for Shader {
-	fn from(value: String) -> Self {
-		Self::Source(value)
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+trait ShaderPath {}
+impl ShaderPath for TypedPath<'_> {}
+impl ShaderPath for TypedPathBuf {}
+impl ShaderPath for Utf8TypedPath<'_> {}
+impl ShaderPath for Utf8TypedPathBuf {}
+impl ShaderPath for UnixPath {}
+impl ShaderPath for UnixPathBuf {}
+impl ShaderPath for Utf8UnixPath {}
+impl ShaderPath for Utf8UnixPathBuf {}
+impl ShaderPath for WindowsPath {}
+impl ShaderPath for WindowsPathBuf {}
+impl ShaderPath for Utf8WindowsPath {}
+impl ShaderPath for Utf8WindowsPathBuf {}
+
+pub trait IntoShader {
+	fn into_shader(self) -> Shader;
+}
+
+impl IntoShader for String {
+	fn into_shader(self) -> Shader {
+		Shader::Source(self)
 	}
 }
 
-impl From<&str> for Shader {
-	fn from(value: &str) -> Self {
-		Self::Source(value.to_owned())
+impl IntoShader for &str {
+	fn into_shader(self) -> Shader {
+		Shader::Source(self.to_owned())
 	}
 }
 
-impl<P> From<P> for Shader
+impl IntoShader for ShaderBuilder {
+	fn into_shader(self) -> Shader {
+		Shader::Builder(self)
+	}
+}
+
+impl IntoShader for &mut ShaderBuilder {
+	fn into_shader(self) -> Shader {
+		Shader::Builder(mem::take(self))
+	}
+}
+
+impl<P> IntoShader for P
 where
 	P: TryInto<Utf8UnixPathBuf> + ShaderPath,
 {
-	fn from(value: P) -> Self {
+	fn into_shader(self) -> Shader {
 		// The case where a path is valid as Windows path but not as Unix is so rare
 		// that it's okay to unwrap here instead of delegating the error to
 		// ShaderBuilder.build
-		Self::Path(value.try_into().or(Err(anyhow!("Invalid shader path"))).unwrap())
+		Shader::Path(self.try_into().or(Err(anyhow!("Invalid shader path"))).unwrap())
 	}
 }
 
-impl From<ShaderBuilder> for Shader {
-	fn from(value: ShaderBuilder) -> Self {
-		Self::Builder(value)
-	}
-}
-
-impl From<&mut ShaderBuilder> for Shader {
-	fn from(value: &mut ShaderBuilder) -> Self {
-		Self::Builder(mem::take(value))
+impl<T> From<T> for Shader
+where
+	T: IntoShader,
+{
+	fn from(value: T) -> Self {
+		value.into_shader()
 	}
 }
 
