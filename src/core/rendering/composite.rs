@@ -103,7 +103,7 @@ impl CompositeRenderer {
 		// 	.create_shader_module(include_wgsl!(src!("shader/composite.wgsl")));
 		let shader = ShaderBuilder::new()
 			.include_path("composite.wgsl")
-			.build(&ShaderAssets, &gpu.device)
+			.build(gpu, &ShaderAssets, 1)
 			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.

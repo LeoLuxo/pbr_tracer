@@ -1,5 +1,3 @@
-use velcro::vec;
-
 use super::{intersector::Intersector, post_processing::PostProcessingPipeline};
 use crate::{
 	core::shader::{Shader, ShaderBuilder},
@@ -35,9 +33,5 @@ impl<T: Intersector> ShaderFragment for PhysBasedRaytracer<T> {
 				"color = post_processing_pipeline(coord, color);",
 			)
 			.into()
-	}
-
-	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
-		vec![self, &self.intersector, &self.ppp]
 	}
 }

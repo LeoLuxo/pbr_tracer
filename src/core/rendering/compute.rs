@@ -8,18 +8,17 @@ use brainrot::{
 };
 use velcro::vec;
 use wgpu::{
-	BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+	BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
 	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
-	ShaderModule, ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
+	ShaderStages, StorageTextureAccess, TextureFormat, TextureViewDimension,
 };
 
 use crate::{
 	core::{
-		buffer::{BindGroupMapping, BufferRegistrar},
 		gameloop::Render,
 		gpu::Gpu,
 		render_target::RenderTarget,
-		shader::ShaderBuilder,
+		shader::{CompiledShader, ShaderBuilder},
 	},
 	fragments::shader_fragments::Renderer,
 	ShaderAssets,
@@ -43,16 +42,6 @@ where
 	fn build(&self, app: &mut App) {
 		// TODO refactor the bufer stuff somehow
 		// Maybe declarative?
-		let fragments = self.renderer.fragments();
-		let mut buffers = BufferRegistrar::new(app, 1, ShaderStages::COMPUTE);
-
-		for fragment in fragments {
-			fragment.declare_buffers(&mut buffers);
-		}
-
-		let bind_group_layouts = buffers.bind_group_layouts();
-		let bind_group_layouts = bind_group_layouts.iter().map(|v| v.as_ref()).collect::<Vec<_>>();
-		let bind_group_mapping = buffers.bind_group_mapping();
 
 		let gpu = app.world.resource::<Gpu>();
 
@@ -60,16 +49,10 @@ where
 		let shader = ShaderBuilder::new()
 			.include_path("compute.wgsl")
 			.include(self.renderer.shader())
-			.build(&ShaderAssets, &gpu.device)
+			.build(gpu, &ShaderAssets, 1)
 			.expect("Couldn't build shader");
 
-		let compute_renderer = ComputeRenderer::new(
-			gpu,
-			self.resolution,
-			shader.shader_module,
-			&bind_group_layouts,
-			bind_group_mapping,
-		);
+		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, shader);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -90,17 +73,11 @@ pub struct ComputeRenderPass;
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
 	pub output_texture: TextureAsset,
-	pub bind_group_mapping: BindGroupMapping,
+	pub shader: CompiledShader,
 }
 
 impl ComputeRenderer {
-	pub fn new(
-		gpu: &Gpu,
-		resolution: ScreenSize,
-		shader: ShaderModule,
-		additional_layouts: &[&BindGroupLayout],
-		bind_group_mapping: BindGroupMapping,
-	) -> Self {
+	pub fn new(gpu: &Gpu, resolution: ScreenSize, shader: CompiledShader) -> Self {
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,
@@ -124,7 +101,7 @@ impl ComputeRenderer {
 			}],
 		});
 
-		let bind_group_layouts = &vec![&texture_bind_grounp_layout, ..additional_layouts];
+		let bind_group_layouts = &vec![&texture_bind_grounp_layout, ..&shader.layouts];
 
 		let pipeline_layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("Compute Pipeline Layout"),
@@ -135,14 +112,14 @@ impl ComputeRenderer {
 		let pipeline = gpu.device.create_compute_pipeline(&ComputePipelineDescriptor {
 			label: Some("Compute pipeline"),
 			layout: Some(&pipeline_layout),
-			module: &shader,
+			module: &shader.shader_module,
 			entry_point: "main",
 		});
 
 		Self {
 			pipeline,
 			output_texture,
-			bind_group_mapping,
+			shader,
 		}
 	}
 }
@@ -179,9 +156,7 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 		compute_pass.set_pipeline(&compute_renderer.pipeline);
 
 		compute_pass.set_bind_group(0, &compute_bind_group, &[]);
-		compute_renderer
-			.bind_group_mapping
-			.apply_to_compute_pass(&mut compute_pass);
+		compute_renderer.shader.groups.apply_to_compute_pass(&mut compute_pass);
 
 		compute_pass.dispatch_workgroups(out_width, out_height, 1);
 	}

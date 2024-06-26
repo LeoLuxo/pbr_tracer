@@ -1,5 +1,4 @@
 use brainrot::path;
-use velcro::vec;
 
 use super::shader_fragments::ShaderFragment;
 use crate::core::shader::{Shader, ShaderBuilder};
@@ -52,13 +51,6 @@ impl ShaderFragment for PostProcessingPipeline {
 
 		builder.into()
 	}
-
-	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
-		vec![
-			self as &dyn ShaderFragment,
-			..self.0.iter().flat_map(|v| (**v).fragments()),
-		]
-	}
 }
 
 /*
@@ -73,9 +65,5 @@ impl PostProcessingEffect for GammaCorrection {}
 impl ShaderFragment for GammaCorrection {
 	fn shader(&self) -> Shader {
 		path!("/post_processing/gamma.wgsl").into()
-	}
-
-	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
-		vec![self]
 	}
 }

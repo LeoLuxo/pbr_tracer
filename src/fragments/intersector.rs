@@ -1,11 +1,11 @@
 use std::mem;
 
-use brainrot::{bevy, path};
+use brainrot::bevy;
 
 use super::shader_fragments::ShaderFragment;
 use crate::core::{
-	buffer::{BufferRegistrar, Bufferable, UniformBuffer},
-	shader::Shader,
+	buffer::{Bufferable, UniformBuffer},
+	shader::{Shader, ShaderBuilder},
 };
 
 /*
@@ -21,7 +21,7 @@ pub trait Intersector: ShaderFragment {}
 pub struct Raymarcher;
 
 #[repr(C)]
-#[derive(bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug, Default, PartialEq)]
+#[derive(bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug, PartialEq)]
 pub struct RaymarchSettings {
 	epsilon: f32,
 	min_march: f32,
@@ -29,9 +29,20 @@ pub struct RaymarchSettings {
 	max_march_steps: u32,
 }
 
+impl Default for RaymarchSettings {
+	fn default() -> Self {
+		Self {
+			epsilon: 0.00001,
+			min_march: 0.001,
+			max_march: 1000.0,
+			max_march_steps: 100,
+		}
+	}
+}
+
 impl Bufferable for RaymarchSettings {}
 impl UniformBuffer for RaymarchSettings {
-	fn get_source_code(&self, group: u32, binding: u32, name: String) -> String {
+	fn get_source_code(&self, group: u32, binding: u32, name: &str) -> String {
 		format!(
 			r#"
 			struct RaymarchSettings {{
@@ -45,8 +56,8 @@ impl UniformBuffer for RaymarchSettings {
 		)
 	}
 
-	fn get_size(&self) -> usize {
-		mem::size_of::<Self>()
+	fn get_size(&self) -> u64 {
+		mem::size_of::<Self>() as u64
 	}
 
 	fn get_data(&self) -> Vec<u8> {
@@ -57,19 +68,9 @@ impl UniformBuffer for RaymarchSettings {
 impl Intersector for Raymarcher {}
 impl ShaderFragment for Raymarcher {
 	fn shader(&self) -> Shader {
-		path!("raymarch/raymarch.wgsl").into()
-	}
-
-	fn fragments(&self) -> Vec<&dyn ShaderFragment> {
-		vec![self]
-	}
-
-	fn declare_buffers(&self, buffers: &mut BufferRegistrar) {
-		buffers.add_uniform_buffer(RaymarchSettings {
-			epsilon: 0.000001,
-			min_march: 0.001,
-			max_march: 1000.0,
-			max_march_steps: 2000,
-		})
+		ShaderBuilder::new()
+			.include_path("raymarch/raymarch.wgsl")
+			.include_uniform("settings", RaymarchSettings::default())
+			.into()
 	}
 }

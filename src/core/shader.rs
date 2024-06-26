@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet, hash::Hash, mem, ops::Range};
+use std::{borrow::Cow, collections::HashSet, fmt::Display, hash::Hash, mem, ops::Range};
 
 use anyhow::{anyhow, Ok, Result};
 use brainrot::{path, root, rooted_path};
@@ -10,12 +10,13 @@ use typed_path::{
 	TypedPath, TypedPathBuf, UnixPath, UnixPathBuf, Utf8TypedPath, Utf8TypedPathBuf, Utf8UnixPath, Utf8UnixPathBuf,
 	Utf8WindowsPath, Utf8WindowsPathBuf, WindowsPath, WindowsPathBuf,
 };
-use velcro::iter;
-use wgpu::{Device, ShaderModule, ShaderModuleDescriptor};
+use velcro::{hash_map, iter};
+use wgpu::{BindGroup, BindGroupLayout, Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{Bufferable, UniformBuffer, UniformBufferArc},
+	buffer::{self, BindGroupMapping, Bufferable, UniformBufferArc},
 	embed::Assets,
+	gpu::Gpu,
 };
 
 /*
@@ -44,8 +45,10 @@ impl ShaderBuilder {
 		self.include(path.into())
 	}
 
-	pub fn include_uniform(&mut self, name: impl Bufferable) -> &mut Self {
-		let uniform = &name as &dyn UniformBuffer;
+	pub fn include_uniform(&mut self, name: impl Into<String>, uniform: impl Bufferable) -> &mut Self {
+		let name = name.into();
+		let arc = UniformBufferArc::new(uniform);
+		self.include(Shader::Uniform { name, arc });
 		self
 	}
 
@@ -58,19 +61,28 @@ impl ShaderBuilder {
 		self
 	}
 
-	pub fn build<T: Assets>(&mut self, shader_map: &T, device: &Device) -> Result<CompiledShader> {
-		let mut state = ShaderBuilderState::new(self.include_directives.clone(), shader_map);
+	pub fn build<T: Assets>(&mut self, gpu: &Gpu, shader_map: &T, bind_group_offset: u32) -> Result<CompiledShader> {
+		let shader_source = self.build_source(gpu, shader_map, bind_group_offset)?;
+		println!("{}", shader_source);
 
-		let shader_source = self.build_source(&mut state)?;
-
-		let compiled_shader = shader_source.build(device);
+		let compiled_shader = shader_source.build(&gpu.device);
 		Ok(compiled_shader)
 	}
 
-	fn build_source(&mut self, state: &mut ShaderBuilderState) -> Result<ShaderSource> {
+	pub fn build_source<T: Assets>(
+		&mut self,
+		gpu: &Gpu,
+		shader_map: &T,
+		bind_group_offset: u32,
+	) -> Result<ShaderSource> {
+		let mut state = ShaderBuilderState::new(gpu, shader_map, bind_group_offset);
+		self.build_source_from_state(&mut state)
+	}
+
+	fn build_source_from_state(&mut self, state: &mut ShaderBuilderState) -> Result<ShaderSource> {
 		let mut builder = mem::take(self);
 
-		let mut shader_source = ShaderSource::new();
+		let mut shader_source = ShaderSource::empty();
 
 		for shader in builder.include_directives.drain() {
 			let included_source = shader.build_recursively(state)?;
@@ -128,17 +140,25 @@ impl ShaderBuilder {
 	}
 }
 
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
 struct ShaderBuilderState<'a> {
-	pub blacklist: HashSet<Shader>,
-	pub binding_group_offset: u32,
+	pub gpu: &'a Gpu,
 	pub shader_map: &'a dyn Assets,
+	pub blacklist: HashSet<Shader>,
+	pub bind_group_offset: u32,
 }
 
 impl<'a> ShaderBuilderState<'a> {
-	pub fn new<T: Assets>(include_directives: LinkedHashSet<Shader>, shader_map: &'a T) -> Self {
+	pub fn new<T: Assets>(gpu: &'a Gpu, shader_map: &'a T, bind_group_offset: u32) -> Self {
 		Self {
-			blacklist: HashSet::from_iter(include_directives),
-			binding_group_offset: 0,
+			gpu,
+			blacklist: HashSet::new(),
+			bind_group_offset,
 			shader_map: shader_map as &'a dyn Assets,
 		}
 	}
@@ -209,15 +229,21 @@ impl Shader {
 
 				Ok(ShaderSource::from_source(source))
 			}
-			Shader::Builder(mut builder) => builder.build_source(state),
+			Shader::Builder(mut builder) => builder.build_source_from_state(state),
 			Shader::Uniform { name, arc } => {
-				let struct_source = arc.get_source_code(state.binding_group_offset, 0, name);
+				let struct_source = arc.get_source_code(state.bind_group_offset, 0, &name);
 
-				state.binding_group_offset += 1;
+				let buffer = buffer::create_buffer(state.gpu, &name, arc.get_size());
+				let bind_group_layout = buffer::create_bind_group_layout(state.gpu, &name, ShaderStages::COMPUTE);
+				let bind_group = buffer::create_bind_group(state.gpu, &name, &buffer, &bind_group_layout);
 
-				// TODO
+				let shader_source =
+					ShaderSource::from_buffer(struct_source, bind_group_layout, bind_group, state.bind_group_offset);
 
-				Ok(ShaderSource::from_source(struct_source))
+				state.bind_group_offset += 1;
+				buffer::upload_buffer_bytes(state.gpu, &buffer, &arc.get_data());
+
+				Ok(shader_source)
 			}
 		}
 	}
@@ -226,7 +252,7 @@ impl Shader {
 		// Check that the file wasn't already included
 		if state.blacklist.contains(&self) {
 			// Not an error, just includes empty source
-			return Ok(ShaderSource::from_source("".to_string()));
+			return Ok(ShaderSource::empty());
 		}
 
 		// Blacklist the shader from including it anymore
@@ -241,8 +267,10 @@ impl Shader {
 		let mut byte_offset: isize = 0;
 		let mut includes = Vec::<(String, Range<usize>)>::new();
 
+		println!("RECURSIVE:\n{}\n======", shader_source);
+
 		// Find all `#include "path/to/shader.wgsl"` in the source
-		let re = Regex::new(r#"(?m)^#include "(.+?)"$"#).unwrap();
+		let re = Regex::new(r#"(?m)^#include "(.+?)""#).unwrap();
 
 		for caps in re.captures_iter(&shader_source.source) {
 			// The bytes that the `#include "path/to/shader.wgsl"` statement occupies
@@ -258,6 +286,8 @@ impl Shader {
 			// Offset the range by byte_offset
 			let range = (range.start as isize + byte_offset) as usize..(range.end as isize + byte_offset) as usize;
 
+			println!("{:?}", range);
+
 			// Fix up the path
 			let path_relative: Utf8UnixPathBuf = path!(&path_str)
 				.try_into()
@@ -272,7 +302,7 @@ impl Shader {
 			byte_offset += (source_to_include.source.len() as isize) - (range.len() as isize);
 
 			// Replace the whole range with the included file source
-			shader_source.source.replace_range(range, &source_to_include.source);
+			shader_source.extend_range(source_to_include, range);
 		}
 
 		Ok(shader_source)
@@ -354,23 +384,46 @@ where
 --------------------------------------------------------------------------------
 */
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct ShaderSource {
 	pub source: String,
+	pub layouts: Vec<BindGroupLayout>,
+	pub groups: BindGroupMapping,
 }
 
 impl ShaderSource {
-	pub fn new() -> Self {
+	pub fn empty() -> Self {
 		Self::default()
 	}
 
 	pub fn from_source(source: String) -> Self {
-		Self { source }
+		Self {
+			source,
+			..Default::default()
+		}
+	}
+
+	pub fn from_buffer(
+		source: String,
+		bind_group_layout: BindGroupLayout,
+		bind_group: BindGroup,
+		bind_group_index: u32,
+	) -> Self {
+		Self {
+			source,
+			layouts: vec![bind_group_layout],
+			groups: BindGroupMapping(hash_map!(bind_group_index: bind_group)),
+		}
+	}
+
+	pub fn extend_range(&mut self, other: ShaderSource, range: Range<usize>) -> &mut Self {
+		self.source.replace_range(range, &other.source);
+		self.extend_extras(other)
 	}
 
 	pub fn extend(&mut self, other: ShaderSource) -> &mut Self {
 		self.source.push_str(&other.source);
-		self
+		self.extend_extras(other)
 	}
 
 	pub fn build(self, device: &Device) -> CompiledShader {
@@ -379,10 +432,32 @@ impl ShaderSource {
 			source: wgpu::ShaderSource::Wgsl(<Cow<str>>::from(self.source)),
 		});
 
-		CompiledShader { shader_module }
+		CompiledShader {
+			shader_module,
+			layouts: self.layouts,
+			groups: self.groups,
+		}
+	}
+
+	fn extend_extras(&mut self, other: ShaderSource) -> &mut Self {
+		self.layouts.extend(other.layouts);
+		self.groups.0.extend(other.groups.0);
+		self
+	}
+}
+
+impl Display for ShaderSource {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(
+			f,
+			"ShaderSource:\nsource: {}\nlayouts: {:?}\ngroups: {:?}",
+			&self.source, &self.layouts, &self.groups
+		)
 	}
 }
 
 pub struct CompiledShader {
 	pub shader_module: ShaderModule,
+	pub layouts: Vec<BindGroupLayout>,
+	pub groups: BindGroupMapping,
 }

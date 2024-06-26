@@ -1,4 +1,4 @@
-use crate::core::{buffer::BufferRegistrar, shader::Shader};
+use crate::core::shader::Shader;
 
 /*
 --------------------------------------------------------------------------------
@@ -8,8 +8,6 @@ use crate::core::{buffer::BufferRegistrar, shader::Shader};
 
 pub trait ShaderFragment: Sync + Send {
 	fn shader(&self) -> Shader;
-	fn fragments(&self) -> Vec<&dyn ShaderFragment>;
-	fn declare_buffers(&self, _buffers: &mut BufferRegistrar) {}
 }
 
 /// Shader API:\
