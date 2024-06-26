@@ -20,7 +20,7 @@ use wgpu::{
 use super::compute::ComputeRenderer;
 use crate::{
 	core::{
-		buffer::{self, UniformBuffer},
+		buffer::{self, SizedUniformBuffer},
 		event_processing::{EventReaderProcessor, ProcessedChangeEvents},
 		events::WindowResizedEvent,
 		gameloop::{Render, Update},
@@ -49,7 +49,7 @@ impl Plugin for CompositeRendererPlugin {
 			ViewportInfo {
 				size: render_target.size,
 			},
-			UniformBuffer::<ViewportInfo>::new(&gpu.device, "viewport", ShaderStages::FRAGMENT),
+			SizedUniformBuffer::<ViewportInfo>::new(&gpu.device, "viewport", ShaderStages::FRAGMENT),
 		);
 
 		let composite_renderer = CompositeRenderer::new(
@@ -103,7 +103,7 @@ impl CompositeRenderer {
 		// 	.create_shader_module(include_wgsl!(src!("shader/composite.wgsl")));
 		let shader = ShaderBuilder::new()
 			.include_path("composite.wgsl")
-			.build::<ShaderAssets>(&gpu.device)
+			.build(&ShaderAssets, &gpu.device)
 			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.
@@ -167,12 +167,12 @@ impl CompositeRenderer {
 			// No vertex buffers, we'll render 2 fullscreen triangles
 			// and set their positions in the shader
 			vertex: VertexState {
-				module: &shader,
+				module: &shader.shader_module,
 				entry_point: "vs_main",
 				buffers: &[],
 			},
 			fragment: Some(FragmentState {
-				module: &shader,
+				module: &shader.shader_module,
 				entry_point: "fs_main",
 				targets: &[Some(ColorTargetState {
 					format: render_target.config.format,
@@ -228,7 +228,7 @@ fn render(
 	composite_renderer: Res<CompositeRenderer>,
 	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
-	q: Query<&UniformBuffer<ViewportInfo>>,
+	q: Query<&SizedUniformBuffer<ViewportInfo>>,
 ) {
 	// trace!("Rendering terrain");
 

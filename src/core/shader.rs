@@ -6,13 +6,17 @@ use hashlink::{LinkedHashMap, LinkedHashSet};
 use rand::seq::IteratorRandom;
 use regex::Regex;
 use replace_with::replace_with_or_abort;
-use rust_embed::Embed;
 use typed_path::{
 	TypedPath, TypedPathBuf, UnixPath, UnixPathBuf, Utf8TypedPath, Utf8TypedPathBuf, Utf8UnixPath, Utf8UnixPathBuf,
 	Utf8WindowsPath, Utf8WindowsPathBuf, WindowsPath, WindowsPathBuf,
 };
 use velcro::iter;
-use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderSource};
+use wgpu::{Device, ShaderModule, ShaderModuleDescriptor};
+
+use super::{
+	buffer::{Bufferable, UniformBuffer, UniformBufferArc},
+	embed::Assets,
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -31,19 +35,18 @@ impl ShaderBuilder {
 		Self::default()
 	}
 
-	pub fn include<S>(&mut self, shader: S) -> &mut Self
-	where
-		S: Into<Shader>,
-	{
+	pub fn include(&mut self, shader: impl Into<Shader>) -> &mut Self {
 		self.include_directives.insert(shader.into());
 		self
 	}
 
-	pub fn include_path<P>(&mut self, path: P) -> &mut Self
-	where
-		P: Into<Utf8UnixPathBuf>,
-	{
-		self.include(Shader::Path(path.into()))
+	pub fn include_path(&mut self, path: impl Into<Utf8UnixPathBuf>) -> &mut Self {
+		self.include(path.into())
+	}
+
+	pub fn include_uniform(&mut self, name: impl Bufferable) -> &mut Self {
+		let uniform = &name as &dyn UniformBuffer;
+		self
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -55,45 +58,41 @@ impl ShaderBuilder {
 		self
 	}
 
-	pub fn build<Assets: Embed>(&mut self, device: &Device) -> Result<CompiledShader> {
-		let source = self.build_source::<Assets>()?;
+	pub fn build<T: Assets>(&mut self, shader_map: &T, device: &Device) -> Result<CompiledShader> {
+		let mut state = ShaderBuilderState::new(self.include_directives.clone(), shader_map);
 
-		let shader_module = device.create_shader_module(ShaderModuleDescriptor {
-			label: None,
-			source: ShaderSource::Wgsl(<Cow<str>>::from(source)),
-		});
+		let shader_source = self.build_source(&mut state)?;
 
-		Ok(CompiledShader { shader_module })
+		let compiled_shader = shader_source.build(device);
+		Ok(compiled_shader)
 	}
 
-	fn build_source<Assets: Embed>(&mut self) -> Result<String> {
+	fn build_source(&mut self, state: &mut ShaderBuilderState) -> Result<ShaderSource> {
 		let mut builder = mem::take(self);
 
-		let mut include_blacklist = HashSet::new();
-
-		let mut source = String::new();
+		let mut shader_source = ShaderSource::new();
 
 		for shader in builder.include_directives.drain() {
-			let included_source = shader.process_source::<Assets>(&mut include_blacklist)?;
-			source.push_str(&included_source);
+			let included_source = shader.build_recursively(state)?;
+			shader_source.extend(included_source);
 		}
 
 		builder
 			.define_directives
-			.extend(Self::process_define_directives(&mut source));
-		source = builder.apply_define_directives(source);
+			.extend(Self::process_define_directives(&mut shader_source));
+		shader_source = builder.apply_define_directives(shader_source);
 
-		Ok(source)
+		Ok(shader_source)
 	}
 
-	fn process_define_directives(source: &mut String) -> LinkedHashMap<String, String> {
+	fn process_define_directives(shader_source: &mut ShaderSource) -> LinkedHashMap<String, String> {
 		let mut define_directives = LinkedHashMap::<String, String>::new();
 
 		// Find all `#define KEY value` in the source
 		let re = Regex::new(r#"(?m)^#define (.+?) (.+?)$"#).unwrap();
 
 		let mut ranges = Vec::<Range<usize>>::new();
-		for caps in re.captures_iter(source) {
+		for caps in re.captures_iter(&shader_source.source) {
 			// The bytes that the `#define ...` statement occupies
 			let range = caps.get(0).unwrap().range();
 			ranges.push(range);
@@ -111,21 +110,37 @@ impl ShaderBuilder {
 			// Decrease offset since we're deleting sections of text
 			offset -= range.len() as isize;
 
-			source.replace_range(range, "");
+			shader_source.source.replace_range(range, "");
 		}
 
 		define_directives
 	}
 
-	fn apply_define_directives(&mut self, mut source: String) -> String {
+	fn apply_define_directives(&mut self, mut shader_source: ShaderSource) -> ShaderSource {
 		let mut directives = self.define_directives.iter().collect::<Vec<_>>();
 		// Sort by reverse size, so from biggest key to smallest key
 		directives.sort_by(|(key1, _), (key2, _)| key2.cmp(key1));
 
 		for (key, value) in directives {
-			source = source.replace(key, value);
+			shader_source.source = shader_source.source.replace(key, value);
 		}
-		source
+		shader_source
+	}
+}
+
+struct ShaderBuilderState<'a> {
+	pub blacklist: HashSet<Shader>,
+	pub binding_group_offset: u32,
+	pub shader_map: &'a dyn Assets,
+}
+
+impl<'a> ShaderBuilderState<'a> {
+	pub fn new<T: Assets>(include_directives: LinkedHashSet<Shader>, shader_map: &'a T) -> Self {
+		Self {
+			blacklist: HashSet::from_iter(include_directives),
+			binding_group_offset: 0,
+			shader_map: shader_map as &'a dyn Assets,
+		}
 	}
 }
 
@@ -135,11 +150,12 @@ impl ShaderBuilder {
 --------------------------------------------------------------------------------
 */
 
-#[derive(Hash, Debug, Clone, Eq, PartialEq)]
+#[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum Shader {
 	Source(String),
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
+	Uniform { name: String, arc: UniformBufferArc },
 }
 
 impl Shader {
@@ -148,14 +164,7 @@ impl Shader {
 			Shader::Source(_) => root!(),
 			Shader::Path(path) => path.parent().map(|x| x.to_owned()).unwrap_or(root!()),
 			Shader::Builder(_) => root!(),
-		}
-	}
-
-	pub fn build<Assets: Embed>(self) -> Result<String> {
-		match self {
-			Shader::Source(source) => Ok(source),
-			Shader::Path(path) => Self::get_path_source::<Assets>(path),
-			Shader::Builder(mut builder) => builder.build_source::<Assets>(),
+			Shader::Uniform { .. } => root!(),
 		}
 	}
 
@@ -170,29 +179,64 @@ impl Shader {
 		let to = format!("{}(", obfuscated);
 
 		replace_with_or_abort(self, |self_| match self_ {
+			// Replace the source string directly
 			Shader::Source(source) => source.replace(&from, &to).into(),
+			// Make the path into a ShaderBuilder instead, and add a define directive
 			Shader::Path(path) => ShaderBuilder::new().include(path).define(from, to).into(),
+			// Add a define directive to the ShaderBuilder
 			Shader::Builder(mut builder) => builder.define(from, to).into(),
+			// Nothing to change in a uniform
+			Shader::Uniform { .. } => self_,
 		});
 
 		obfuscated
 	}
 
-	fn process_source<Assets: Embed>(self, blacklist: &mut HashSet<Shader>) -> Result<String> {
+	fn get_raw_source(self, state: &mut ShaderBuilderState) -> Result<ShaderSource> {
+		match self {
+			Shader::Source(source) => Ok(ShaderSource::from_source(source)),
+			Shader::Path(path) => {
+				let path = rooted_path!(path);
+
+				// Get the source from the shader map
+				let source_data = state
+					.shader_map
+					.get(path.as_str())
+					.ok_or(anyhow!("File not found: {}", path.as_str()))?
+					.data;
+				let source =
+					String::from_utf8(source_data.to_vec()).or(Err(anyhow!("Invalid UTF8 file: {}", path.as_str())))?;
+
+				Ok(ShaderSource::from_source(source))
+			}
+			Shader::Builder(mut builder) => builder.build_source(state),
+			Shader::Uniform { name, arc } => {
+				let struct_source = arc.get_source_code(state.binding_group_offset, 0, name);
+
+				state.binding_group_offset += 1;
+
+				// TODO
+
+				Ok(ShaderSource::from_source(struct_source))
+			}
+		}
+	}
+
+	fn build_recursively(self, state: &mut ShaderBuilderState) -> Result<ShaderSource> {
 		// Check that the file wasn't already included
-		if blacklist.contains(&self) {
+		if state.blacklist.contains(&self) {
 			// Not an error, just includes empty source
-			return Ok("".to_string());
+			return Ok(ShaderSource::from_source("".to_string()));
 		}
 
 		// Blacklist the shader from including it anymore
-		(*blacklist).insert(self.clone());
+		state.blacklist.insert(self.clone());
 
 		// The path of the current shader file
 		let parent_path = self.get_parent();
 
 		// Get the source from the shader
-		let mut source = self.build::<Assets>()?;
+		let mut shader_source = self.get_raw_source(state)?;
 
 		let mut byte_offset: isize = 0;
 		let mut includes = Vec::<(String, Range<usize>)>::new();
@@ -200,7 +244,7 @@ impl Shader {
 		// Find all `#include "path/to/shader.wgsl"` in the source
 		let re = Regex::new(r#"(?m)^#include "(.+?)"$"#).unwrap();
 
-		for caps in re.captures_iter(&source) {
+		for caps in re.captures_iter(&shader_source.source) {
 			// The bytes that the `#include "path/to/shader.wgsl"` statement occupies
 			let range = caps.get(0).unwrap().range();
 			// The `path/to/shader.wgsl` part
@@ -221,30 +265,17 @@ impl Shader {
 			let path_absolute = rooted_path!(parent_path.join(path_relative));
 
 			// Recursively build the source of the included file
-			let source_to_include = Self::process_source::<Assets>(path_absolute.into(), blacklist)?;
+			let source_to_include = path_absolute.into_shader().build_recursively(state)?;
 
 			// Get the byte-size of the file to be inserted, to shift the other insertions
 			// afterwards
-			byte_offset += (source_to_include.len() as isize) - (range.len() as isize);
+			byte_offset += (source_to_include.source.len() as isize) - (range.len() as isize);
 
 			// Replace the whole range with the included file source
-			source.replace_range(range, &source_to_include);
+			shader_source.source.replace_range(range, &source_to_include.source);
 		}
 
-		Ok(source)
-	}
-
-	fn get_path_source<Assets: Embed>(path: Utf8UnixPathBuf) -> Result<String> {
-		let path = rooted_path!(path);
-
-		// Get the source from the shader map
-		let source_data = Assets::get(path.as_str())
-			.ok_or(anyhow!("File not found: {}", path.as_str()))?
-			.data;
-		let source =
-			String::from_utf8(source_data.to_vec()).or(Err(anyhow!("Invalid UTF8 file: {}", path.as_str())))?;
-
-		Ok(source)
+		Ok(shader_source)
 	}
 }
 
@@ -268,7 +299,7 @@ impl ShaderPath for WindowsPathBuf {}
 impl ShaderPath for Utf8WindowsPath {}
 impl ShaderPath for Utf8WindowsPathBuf {}
 
-pub trait IntoShader {
+trait IntoShader {
 	fn into_shader(self) -> Shader;
 }
 
@@ -323,6 +354,35 @@ where
 --------------------------------------------------------------------------------
 */
 
-struct CompiledShader {
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ShaderSource {
+	pub source: String,
+}
+
+impl ShaderSource {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
+	pub fn from_source(source: String) -> Self {
+		Self { source }
+	}
+
+	pub fn extend(&mut self, other: ShaderSource) -> &mut Self {
+		self.source.push_str(&other.source);
+		self
+	}
+
+	pub fn build(self, device: &Device) -> CompiledShader {
+		let shader_module = device.create_shader_module(ShaderModuleDescriptor {
+			label: None,
+			source: wgpu::ShaderSource::Wgsl(<Cow<str>>::from(self.source)),
+		});
+
+		CompiledShader { shader_module }
+	}
+}
+
+pub struct CompiledShader {
 	pub shader_module: ShaderModule,
 }

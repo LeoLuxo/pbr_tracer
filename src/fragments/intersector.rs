@@ -1,7 +1,12 @@
+use std::mem;
+
 use brainrot::{bevy, path};
 
 use super::shader_fragments::ShaderFragment;
-use crate::core::{buffer::BufferRegistrar, shader::Shader};
+use crate::core::{
+	buffer::{BufferRegistrar, Bufferable, UniformBuffer},
+	shader::Shader,
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -22,6 +27,31 @@ pub struct RaymarchSettings {
 	min_march: f32,
 	max_march: f32,
 	max_march_steps: u32,
+}
+
+impl Bufferable for RaymarchSettings {}
+impl UniformBuffer for RaymarchSettings {
+	fn get_source_code(&self, group: u32, binding: u32, name: String) -> String {
+		format!(
+			r#"
+			struct RaymarchSettings {{
+				epsilon: f32,
+				min_march: f32,
+				max_march: f32,
+				max_march_steps: u32,
+			}};
+			@group({group}) @binding({binding}) var<uniform> {name}: RaymarchSettings;
+		"#
+		)
+	}
+
+	fn get_size(&self) -> usize {
+		mem::size_of::<Self>()
+	}
+
+	fn get_data(&self) -> Vec<u8> {
+		bytemuck::bytes_of(self).to_owned()
+	}
 }
 
 impl Intersector for Raymarcher {}

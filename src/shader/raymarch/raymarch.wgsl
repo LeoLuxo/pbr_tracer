@@ -3,15 +3,6 @@
 #include "primitives.wgsl"
 
 
-struct RaymarchSettings {
-	epsilon: f32,
-	min_march: f32,
-	max_march: f32,
-	max_march_steps: u32,
-};
-@group(1) @binding(0) var<uniform> settings: RaymarchSettings;
-
-
 fn send_ray(ray_origin: vec3f, ray_dir: vec3f) -> vec4f {
 	var iters: u32;
 	var t = settings.min_march;

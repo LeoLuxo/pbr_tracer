@@ -1633,6 +1633,7 @@ dependencies = [
  "bevy_tasks",
  "brainrot",
  "bytemuck",
+ "derive_more",
  "env_logger",
  "hashlink",
  "log",

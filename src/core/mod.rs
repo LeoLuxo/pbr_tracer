@@ -1,5 +1,6 @@
 pub mod buffer;
 pub mod display;
+pub mod embed;
 pub mod event_processing;
 pub mod events;
 pub mod gameloop;

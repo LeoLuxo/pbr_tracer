@@ -60,7 +60,7 @@ where
 		let shader = ShaderBuilder::new()
 			.include_path("compute.wgsl")
 			.include(self.renderer.shader())
-			.build::<ShaderAssets>(&gpu.device)
+			.build(&ShaderAssets, &gpu.device)
 			.expect("Couldn't build shader");
 
 		let compute_renderer = ComputeRenderer::new(
