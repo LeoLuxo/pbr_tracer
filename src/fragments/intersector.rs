@@ -1,10 +1,11 @@
 use std::mem;
 
 use brainrot::bevy;
+use pbr_tracer_derive::UniformBuffer;
 
 use super::shader_fragments::ShaderFragment;
 use crate::core::{
-	buffer::{Bufferable, UniformBuffer},
+	buffer::{Bufferable, UniformBuffer, WgslType},
 	shader::{Shader, ShaderBuilder},
 };
 
@@ -21,7 +22,7 @@ pub trait Intersector: ShaderFragment {}
 pub struct Raymarcher;
 
 #[repr(C)]
-#[derive(bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug, PartialEq)]
+#[derive(UniformBuffer, bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug, PartialEq)]
 pub struct RaymarchSettings {
 	epsilon: f32,
 	min_march: f32,
@@ -37,31 +38,6 @@ impl Default for RaymarchSettings {
 			max_march: 1000.0,
 			max_march_steps: 100,
 		}
-	}
-}
-
-impl Bufferable for RaymarchSettings {}
-impl UniformBuffer for RaymarchSettings {
-	fn get_source_code(&self, group: u32, binding: u32, name: &str) -> String {
-		format!(
-			r#"
-			struct RaymarchSettings {{
-				epsilon: f32,
-				min_march: f32,
-				max_march: f32,
-				max_march_steps: u32,
-			}};
-			@group({group}) @binding({binding}) var<uniform> {name}: RaymarchSettings;
-		"#
-		)
-	}
-
-	fn get_size(&self) -> u64 {
-		mem::size_of::<Self>() as u64
-	}
-
-	fn get_data(&self) -> Vec<u8> {
-		bytemuck::bytes_of(self).to_owned()
 	}
 }
 

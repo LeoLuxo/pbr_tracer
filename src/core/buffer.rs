@@ -8,7 +8,10 @@ use std::{
 };
 
 use bevy_ecs::system::{Query, Res};
-use brainrot::bevy::{self, App};
+use brainrot::{
+	bevy::{self, App},
+	vek,
+};
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
 	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ComputePass, Device, RenderPass,
@@ -22,6 +25,26 @@ use super::{gameloop::PreRender, gpu::Gpu};
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
+
+pub trait WgslType {
+	fn name() -> String;
+}
+
+#[rustfmt::skip] impl                              WgslType for bool         {fn name() -> String {format!("bool")}}
+#[rustfmt::skip] impl                              WgslType for i32          {fn name() -> String {format!("i32")}}
+#[rustfmt::skip] impl                              WgslType for u32          {fn name() -> String {format!("u32")}}
+#[rustfmt::skip] impl                              WgslType for f32          {fn name() -> String {format!("f32")}}
+#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Vec2<T> {fn name() -> String {format!("vec2<{}>", T::name())}}
+#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Vec3<T> {fn name() -> String {format!("vec3<{}>", T::name())}}
+#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Vec4<T> {fn name() -> String {format!("vec4<{}>", T::name())}}
+#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Mat2<T> {fn name() -> String {format!("mat2x2<{}>", T::name())}}
+#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Mat3<T> {fn name() -> String {format!("mat3x3<{}>", T::name())}}
+#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Mat4<T> {fn name() -> String {format!("mat4x4<{}>", T::name())}}
+#[rustfmt::skip] impl<E: WgslType>                 WgslType for [E]          {fn name() -> String {format!("array<{}>", E::name())}}
+#[rustfmt::skip] impl<E: WgslType, const N: usize> WgslType for [E; N]       {fn name() -> String {format!("array<{},{}>", E::name(), N)}}
+
+// Incompatible:
+// impl WgslType for f16 {fn name() -> String {format!("f16")}}
 
 pub trait UniformBuffer: std::fmt::Debug {
 	fn get_source_code(&self, group: u32, binding: u32, name: &str) -> String;
