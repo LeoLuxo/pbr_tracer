@@ -22,7 +22,7 @@ use wgpu::{
 use super::compute::ComputeRenderer;
 use crate::{
 	core::{
-		buffer::{self, Buffer, BufferUploadable, ShaderStruct, Uniform, WgslType},
+		buffer::{self, ShaderType, StorageBuffer, Uniform},
 		event_processing::{EventReaderProcessor, ProcessedChangeEvents},
 		events::WindowResizedEvent,
 		gameloop::{Render, Update},
@@ -50,11 +50,13 @@ impl Plugin for CompositeRendererPlugin {
 		let viewport_info = ViewportInfo {
 			size: render_target.size,
 		};
-		let viewport_buffer = Buffer::new(
+		let viewport_buffer = StorageBuffer::new(
 			gpu,
 			ShaderStages::FRAGMENT,
-			viewport_info.get_size(),
-			&<Uniform<ViewportInfo>>::new("viewport_size"),
+			&Uniform {
+				data: viewport_info,
+				var_name: "viewport_size".to_string(),
+			},
 		);
 
 		let composite_renderer = CompositeRenderer::new(
@@ -233,7 +235,7 @@ fn render(
 	composite_renderer: Res<CompositeRenderer>,
 	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
-	q: Query<&Buffer, With<ViewportInfo>>,
+	q: Query<&StorageBuffer, With<ViewportInfo>>,
 ) {
 	// trace!("Rendering terrain");
 

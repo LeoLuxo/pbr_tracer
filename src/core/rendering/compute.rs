@@ -101,7 +101,7 @@ impl ComputeRenderer {
 			}],
 		});
 
-		let bind_group_layouts = &vec![&texture_bind_grounp_layout, ..&shader.layouts];
+		let bind_group_layouts = &vec![&texture_bind_grounp_layout, ..shader.buffers.layouts()];
 
 		let pipeline_layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("Compute Pipeline Layout"),
@@ -156,7 +156,7 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 		compute_pass.set_pipeline(&compute_renderer.pipeline);
 
 		compute_pass.set_bind_group(0, &compute_bind_group, &[]);
-		compute_renderer.shader.groups.apply_to_compute_pass(&mut compute_pass);
+		compute_renderer.shader.buffers.apply_to_compute_pass(&mut compute_pass);
 
 		compute_pass.dispatch_workgroups(out_width, out_height, 1);
 	}

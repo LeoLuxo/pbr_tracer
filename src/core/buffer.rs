@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, mem};
+use std::{collections::HashMap, mem};
 
 use bevy_ecs::system::{Query, Res};
 use brainrot::{
@@ -7,11 +7,11 @@ use brainrot::{
 };
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingType, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, ComputePass, RenderPass,
-	ShaderStages,
+	BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages,
+	ComputePass, RenderPass, ShaderStages,
 };
 
-use super::{gameloop::PreRender, gpu::Gpu};
+use super::{gameloop::PreRender, gpu::Gpu, smart_arc::SmartArc};
 
 /*
 --------------------------------------------------------------------------------
@@ -19,72 +19,59 @@ use super::{gameloop::PreRender, gpu::Gpu};
 --------------------------------------------------------------------------------
 */
 
-pub trait ShaderStruct {
-	fn get_source_code() -> String;
+pub trait ShaderType {
+	fn type_name() -> String;
+	fn struct_definition() -> Option<String> {
+		None
+	}
 }
 
-pub trait WgslType {
-	fn name() -> String;
-}
+#[rustfmt::skip] impl                ShaderType for bool            {fn type_name() -> String {"bool".to_string()}}
+#[rustfmt::skip] impl                ShaderType for i32             {fn type_name() -> String {"i32".to_string()}}
+#[rustfmt::skip] impl                ShaderType for u32             {fn type_name() -> String {"u32".to_string()}}
+#[rustfmt::skip] impl                ShaderType for f32             {fn type_name() -> String {"f32".to_string()}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Vec2<T>    {fn type_name() -> String {format!("vec2<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Vec3<T>    {fn type_name() -> String {format!("vec3<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Vec4<T>    {fn type_name() -> String {format!("vec4<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Extent2<T> {fn type_name() -> String {format!("vec2<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Extent3<T> {fn type_name() -> String {format!("vec3<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Rgb<T>     {fn type_name() -> String {format!("vec3<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Rgba<T>    {fn type_name() -> String {format!("vec4<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Mat2<T>    {fn type_name() -> String {format!("mat2x2<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Mat3<T>    {fn type_name() -> String {format!("mat3x3<{}>", T::type_name())}}
+#[rustfmt::skip] impl<T: ShaderType> ShaderType for vek::Mat4<T>    {fn type_name() -> String {format!("mat4x4<{}>", T::type_name())}}
 
-#[rustfmt::skip] impl                              WgslType for bool            {fn name() -> String {"bool".to_string()}}
-#[rustfmt::skip] impl                              WgslType for i32             {fn name() -> String {"i32".to_string()}}
-#[rustfmt::skip] impl                              WgslType for u32             {fn name() -> String {"u32".to_string()}}
-#[rustfmt::skip] impl                              WgslType for f32             {fn name() -> String {"f32".to_string()}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Vec2<T>    {fn name() -> String {format!("vec2<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Vec3<T>    {fn name() -> String {format!("vec3<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Vec4<T>    {fn name() -> String {format!("vec4<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Extent2<T> {fn name() -> String {format!("vec2<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Extent3<T> {fn name() -> String {format!("vec3<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Rgb<T>     {fn name() -> String {format!("vec3<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Rgba<T>    {fn name() -> String {format!("vec4<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Mat2<T>    {fn name() -> String {format!("mat2x2<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Mat3<T>    {fn name() -> String {format!("mat3x3<{}>", T::name())}}
-#[rustfmt::skip] impl<T: WgslType>                 WgslType for vek::Mat4<T>    {fn name() -> String {format!("mat4x4<{}>", T::name())}}
-#[rustfmt::skip] impl<E: WgslType>                 WgslType for [E]             {fn name() -> String {format!("array<{}>", E::name())}}
-#[rustfmt::skip] impl<E: WgslType, const N: usize> WgslType for [E; N]          {fn name() -> String {format!("array<{},{}>", E::name(), N)}}
+#[rustfmt::skip] impl<E: ShaderType>                 ShaderType for [E]    {fn type_name() -> String {format!("array<{}>", E::type_name())}}
+#[rustfmt::skip] impl<E: ShaderType, const N: usize> ShaderType for [E; N] {fn type_name() -> String {format!("array<{},{}>", E::type_name(), N)}}
 
 // Incompatible:
 // impl WgslType for f16 {fn name() -> String {format!("f16")}}
 
 pub trait BufferUploadable: std::fmt::Debug {
 	fn get_size(&self) -> u64;
-	fn get_data(&self) -> Vec<u8>;
+	fn get_bytes(&self) -> Vec<u8>;
+	fn type_name(&self) -> String;
+	fn struct_definition(&self) -> Option<String>;
 }
 
-macro_rules! impl_buffer_uploadable {
-	() => {
-		fn get_size(&self) -> u64 {
-			mem::size_of::<Self>() as u64
-		}
+// This blanket impl excludes [E]
+impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> BufferUploadable for T {
+	fn get_size(&self) -> u64 {
+		mem::size_of::<Self>() as u64
+	}
 
-		fn get_data(&self) -> Vec<u8> {
-			bytemuck::bytes_of(self).to_owned()
-		}
-	};
+	fn get_bytes(&self) -> Vec<u8> {
+		bytemuck::bytes_of(self).to_owned()
+	}
+
+	fn type_name(&self) -> String {
+		<Self as ShaderType>::type_name()
+	}
+
+	fn struct_definition(&self) -> Option<String> {
+		<Self as ShaderType>::struct_definition()
+	}
 }
-
-trait BufferUploadableSubType: WgslType + bytemuck::Pod + std::fmt::Debug {}
-impl<T: WgslType + bytemuck::Pod + std::fmt::Debug> BufferUploadableSubType for T {}
-
-#[rustfmt::skip] impl                                             BufferUploadable for bool            {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl                                             BufferUploadable for i32             {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl                                             BufferUploadable for u32             {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl                                             BufferUploadable for f32             {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Vec2<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Vec3<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Vec4<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Extent2<T> {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Extent3<T> {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Rgb<T>     {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Rgba<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Mat2<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Mat3<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<T: BufferUploadableSubType>                 BufferUploadable for vek::Mat4<T>    {impl_buffer_uploadable!();}
-#[rustfmt::skip] impl<E: BufferUploadableSubType, const N: usize> BufferUploadable for [E; N]          {impl_buffer_uploadable!();}
-
-// Incompatible:
-// impl<E: WgslType> BufferUploadable for [E] {impl_buffer_uploadable!();}
 
 /*
 --------------------------------------------------------------------------------
@@ -92,47 +79,57 @@ impl<T: WgslType + bytemuck::Pod + std::fmt::Debug> BufferUploadableSubType for 
 --------------------------------------------------------------------------------
 */
 
-pub trait BufferType {
-	fn create_buffer(&self, gpu: &Gpu, size: u64) -> wgpu::Buffer;
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> wgpu::BindGroupLayout;
-	fn create_bind_group(&self, gpu: &Gpu, buffer: &wgpu::Buffer, layout: &BindGroupLayout) -> BindGroup;
-	fn get_source_code(&self, group: u32, binding_offset: u32) -> String;
+pub trait StorageBufferBounds: BufferUploadable + ShaderType {}
+impl<T: BufferUploadable + ShaderType> StorageBufferBounds for T {}
+
+pub trait ShaderBuffer {
+	fn bind_group_layout(&self) -> &BindGroupLayout;
+	fn bind_group(&self) -> &BindGroup;
+	fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress);
 }
 
-pub struct Uniform<'a, DataType>
-where
-	DataType: BufferUploadable + WgslType,
-{
-	pub var_name: &'a str,
-	_data_type: PhantomData<DataType>,
+pub trait ShaderBufferDescriptor {
+	fn label(&self, label_type: &str) -> String;
+	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String;
+	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout;
+	fn create_bind_group(&self, gpu: &Gpu, binding_resource: BindingResource, layout: &BindGroupLayout) -> BindGroup;
 }
 
-impl<'a, DataType> Uniform<'a, DataType>
-where
-	DataType: BufferUploadable + WgslType,
-{
-	pub fn new(var_name: &'a str) -> Self {
-		Self {
-			var_name,
-			_data_type: PhantomData,
-		}
+pub trait StorageBufferDescriptor: ShaderBufferDescriptor {
+	fn create_buffer(&self, gpu: &Gpu) -> Buffer;
+}
+
+pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
+	// fn create_texture(&self, gpu: &Gpu) -> Buffer;
+}
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+pub struct Uniform<T: StorageBufferBounds> {
+	pub var_name: String,
+	pub data: T,
+}
+
+impl<T: StorageBufferBounds> ShaderBufferDescriptor for Uniform<T> {
+	fn label(&self, label_type: &str) -> String {
+		format!("{} <{}> {}", self.var_name, <T as ShaderType>::type_name(), label_type)
 	}
-}
 
-impl<DataType> BufferType for Uniform<'_, DataType>
-where
-	DataType: BufferUploadable + WgslType,
-{
-	fn create_buffer(&self, gpu: &Gpu, size: u64) -> wgpu::Buffer {
-		gpu.device.create_buffer(&BufferDescriptor {
-			label: Some(&format!("{} <{}> Buffer", self.var_name, DataType::name())),
-			size,
-			usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-			mapped_at_creation: false,
-		})
+	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String {
+		format!(
+			"@group({}) @binding({}) var<uniform> {}: {};",
+			group,
+			binding_offset,
+			self.var_name,
+			<T as ShaderType>::type_name()
+		)
 	}
 
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> wgpu::BindGroupLayout {
+	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout {
 		gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
 			entries: &[BindGroupLayoutEntry {
 				binding: 0,
@@ -144,64 +141,79 @@ where
 				},
 				count: None,
 			}],
-			label: Some(&format!("{} <{}> Bingdgroup Layout", self.var_name, DataType::name())),
+			label: Some(&self.label("Bind Group Layout")),
 		})
 	}
 
-	fn create_bind_group(&self, gpu: &Gpu, buffer: &wgpu::Buffer, layout: &BindGroupLayout) -> BindGroup {
+	fn create_bind_group(&self, gpu: &Gpu, binding_resource: BindingResource, layout: &BindGroupLayout) -> BindGroup {
 		gpu.device.create_bind_group(&BindGroupDescriptor {
 			layout,
 			entries: &[BindGroupEntry {
 				binding: 0,
-				resource: buffer.as_entire_binding(),
+				resource: binding_resource,
 			}],
-			label: Some(&format!("{} <{}> Bingdgroup", self.var_name, DataType::name())),
+			label: Some(&self.label("Bind Group")),
 		})
 	}
+}
 
-	fn get_source_code(&self, group: u32, binding_offset: u32) -> String {
-		format!(
-			"@group({}) @binding({}) var<uniform> {}: {};",
-			group,
-			binding_offset,
-			self.var_name,
-			DataType::name()
-		)
+impl<T: StorageBufferBounds> StorageBufferDescriptor for Uniform<T> {
+	fn create_buffer(&self, gpu: &Gpu) -> Buffer {
+		let buffer = gpu.device.create_buffer(&BufferDescriptor {
+			label: Some(&self.label("Buffer")),
+			size: self.data.get_size(),
+			usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+			mapped_at_creation: false,
+		});
+
+		upload_bytes_to_buffer(gpu, &buffer, &self.data.get_bytes(), 0);
+		buffer
 	}
 }
 
-pub trait BufferDataType<B: BufferType>: BufferUploadable {}
-impl<T: BufferUploadable + WgslType> BufferDataType<Uniform<'_, T>> for T {}
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
 
 #[derive(bevy::Component, Debug)]
-pub struct Buffer {
-	pub buffer: wgpu::Buffer,
-	pub bind_group_layout: wgpu::BindGroupLayout,
-	pub bind_group: wgpu::BindGroup,
+pub struct StorageBuffer {
+	pub buffer: Buffer,
+	pub bind_group_layout: BindGroupLayout,
+	pub bind_group: BindGroup,
 }
 
-impl Buffer {
-	pub fn new(gpu: &Gpu, visibility: ShaderStages, size: u64, buffer_type: &dyn BufferType) -> Self {
-		// Create a uniform buffer for data in T
-		// In wgpu, uniforms need to be explicitly created as buffers
-		let buffer = buffer_type.create_buffer(gpu, size);
-		let bind_group_layout = buffer_type.create_bind_group_layout(gpu, visibility);
-		let bind_group = buffer_type.create_bind_group(gpu, &buffer, &bind_group_layout);
+impl StorageBuffer {
+	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn StorageBufferDescriptor) -> Self {
+		let buffer = shader_buffer.create_buffer(gpu);
+		let bind_group_layout = shader_buffer.create_bind_group_layout(gpu, visibility);
+		let bind_group = shader_buffer.create_bind_group(gpu, buffer.as_entire_binding(), &bind_group_layout);
 
-		Buffer {
+		StorageBuffer {
 			buffer,
 			bind_group_layout,
 			bind_group,
 		}
 	}
+}
 
-	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress) {
+impl ShaderBuffer for StorageBuffer {
+	fn bind_group_layout(&self) -> &BindGroupLayout {
+		&self.bind_group_layout
+	}
+
+	fn bind_group(&self) -> &BindGroup {
+		&self.bind_group
+	}
+
+	fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress) {
 		upload_bytes_to_buffer(gpu, &self.buffer, bytes, offset)
 	}
 }
 
-pub fn upload_bytes_to_buffer(gpu: &Gpu, raw_buffer: &wgpu::Buffer, bytes: &[u8], offset: BufferAddress) {
-	gpu.queue.write_buffer(raw_buffer, offset, bytes)
+pub fn upload_bytes_to_buffer(gpu: &Gpu, buffer: &Buffer, bytes: &[u8], offset: BufferAddress) {
+	gpu.queue.write_buffer(buffer, offset, bytes)
 }
 
 /*
@@ -211,19 +223,23 @@ pub fn upload_bytes_to_buffer(gpu: &Gpu, raw_buffer: &wgpu::Buffer, bytes: &[u8]
 */
 
 #[derive(Debug, Default)]
-pub struct BindGroupMapping(pub HashMap<u32, BindGroup>);
+pub struct BufferMapping(pub HashMap<u32, SmartArc<dyn ShaderBuffer + Sync + Send>>);
 
-impl<'a> BindGroupMapping {
+impl<'a> BufferMapping {
 	pub fn apply_to_render_pass(&'a self, render_pass: &mut RenderPass<'a>) {
-		for (index, bind_group) in &self.0 {
-			render_pass.set_bind_group(*index, bind_group, &[]);
+		for (index, shader_buffer) in &self.0 {
+			render_pass.set_bind_group(*index, shader_buffer.bind_group(), &[]);
 		}
 	}
 
 	pub fn apply_to_compute_pass(&'a self, compute_pass: &mut ComputePass<'a>) {
-		for (index, bind_group) in &self.0 {
-			compute_pass.set_bind_group(*index, bind_group, &[]);
+		for (index, shader_buffer) in &self.0 {
+			compute_pass.set_bind_group(*index, shader_buffer.bind_group(), &[]);
 		}
+	}
+
+	pub fn layouts(&self) -> impl Iterator<Item = &BindGroupLayout> {
+		self.0.values().map(|buffer| buffer.bind_group_layout())
 	}
 }
 
@@ -240,11 +256,11 @@ where
 	app.add_systems(PreRender, upload_buffers_system::<T>);
 }
 
-fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &Buffer)>)
+fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &StorageBuffer)>)
 where
 	T: BufferUploadable + bevy::Component + Send + Sync,
 {
 	for (data, buffer) in q.iter() {
-		buffer.upload_bytes(&gpu, &data.get_data(), 0);
+		buffer.upload_bytes(&gpu, &data.get_bytes(), 0);
 	}
 }

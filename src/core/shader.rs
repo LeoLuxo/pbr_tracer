@@ -11,10 +11,10 @@ use typed_path::{
 	Utf8WindowsPath, Utf8WindowsPathBuf, WindowsPath, WindowsPathBuf,
 };
 use velcro::{hash_map, iter};
-use wgpu::{BindGroup, BindGroupLayout, Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
+use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{BindGroupMapping, Buffer, BufferDataType, BufferType, BufferUploadable, ShaderStruct},
+	buffer::{BufferMapping, ShaderBuffer, ShaderType, StorageBuffer, StorageBufferBounds, StorageBufferDescriptor},
 	embed::Assets,
 	gpu::Gpu,
 	smart_arc::SmartArc,
@@ -46,21 +46,21 @@ impl ShaderBuilder {
 		self.include(path.into())
 	}
 
-	pub fn include_struct<S>(&mut self) -> &mut Self
+	pub fn include_storage<T>(&mut self, storage: impl StorageBufferDescriptor + 'static) -> &mut Self
 	where
-		S: ShaderStruct,
+		T: StorageBufferBounds,
 	{
-		self.include(S::get_source_code())
+		if let Some(struct_source_code) = <T as ShaderType>::struct_definition() {
+			self.include(Shader::Source(struct_source_code));
+		}
+
+		self.include(Shader::StorageBuffer(SmartArc(
+			Arc::new(storage) as Arc<dyn StorageBufferDescriptor>
+		)))
 	}
 
-	pub fn include_buffer<B, D>(&mut self, buffer_type: B, data: D) -> &mut Self
-	where
-		B: BufferType + 'static,
-		D: BufferDataType<B> + 'static,
-	{
-		let buffer_type = SmartArc(Arc::new(buffer_type) as Arc<dyn BufferType>);
-		let data = SmartArc(Arc::new(data) as Arc<dyn BufferUploadable>);
-		self.include(Shader::Buffer { buffer_type, data })
+	pub fn include_texture(&mut self) -> &mut Self {
+		todo!()
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -200,10 +200,7 @@ pub enum Shader {
 	Source(String),
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
-	Buffer {
-		buffer_type: SmartArc<dyn BufferType>,
-		data: SmartArc<dyn BufferUploadable>,
-	},
+	StorageBuffer(SmartArc<dyn StorageBufferDescriptor>),
 }
 
 impl Shader {
@@ -212,7 +209,7 @@ impl Shader {
 			Shader::Source(_) => root!(),
 			Shader::Path(path) => path.parent().map(|x| x.to_owned()).unwrap_or(root!()),
 			Shader::Builder(_) => root!(),
-			Shader::Buffer { .. } => root!(),
+			Shader::StorageBuffer(_) => root!(),
 		}
 	}
 
@@ -234,7 +231,7 @@ impl Shader {
 			// Add a define directive to the ShaderBuilder
 			Shader::Builder(mut builder) => builder.define(from, to).into(),
 			// Nothing to change in a uniform
-			Shader::Buffer { .. } => self_,
+			Shader::StorageBuffer(_) => self_,
 		});
 
 		obfuscated
@@ -258,21 +255,10 @@ impl Shader {
 				Ok(ShaderSource::from_source(source))
 			}
 			Shader::Builder(mut builder) => builder.build_source_from_state(state),
-			Shader::Buffer { buffer_type, data } => {
-				let source = buffer_type.get_source_code(state.bind_group_offset, 0);
-
-				// println!("\n\nsource of the buffer: {}\n", source);
-
-				let buffer = Buffer::new(state.gpu, state.shader_stages, data.get_size(), buffer_type.as_ref());
-
-				buffer.upload_bytes(state.gpu, &data.get_data(), 0);
-
-				let shader_source = ShaderSource::from_buffer(
-					source,
-					buffer.bind_group_layout,
-					buffer.bind_group,
-					state.bind_group_offset,
-				);
+			Shader::StorageBuffer(buffer) => {
+				let source = buffer.binding_source_code(state.bind_group_offset, 0);
+				let buffer = StorageBuffer::new(state.gpu, state.shader_stages, buffer.as_ref());
+				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
 				state.bind_group_offset += 1;
 
@@ -420,8 +406,7 @@ where
 #[derive(Debug, Default)]
 pub struct ShaderSource {
 	pub source: String,
-	pub layouts: Vec<BindGroupLayout>,
-	pub groups: BindGroupMapping,
+	pub buffers: BufferMapping,
 }
 
 impl ShaderSource {
@@ -436,16 +421,15 @@ impl ShaderSource {
 		}
 	}
 
-	pub fn from_buffer(
-		source: String,
-		bind_group_layout: BindGroupLayout,
-		bind_group: BindGroup,
-		bind_group_index: u32,
-	) -> Self {
+	pub fn from_buffer<B>(source: String, buffer: B, bind_group_index: u32) -> Self
+	where
+		B: ShaderBuffer + Sync + Send + 'static,
+	{
 		Self {
 			source,
-			layouts: vec![bind_group_layout],
-			groups: BindGroupMapping(hash_map!(bind_group_index: bind_group)),
+			buffers: BufferMapping(
+				hash_map!(bind_group_index: SmartArc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)),
+			),
 		}
 	}
 
@@ -467,14 +451,12 @@ impl ShaderSource {
 
 		CompiledShader {
 			shader_module,
-			layouts: self.layouts,
-			groups: self.groups,
+			buffers: self.buffers,
 		}
 	}
 
 	fn extend_extras(&mut self, other: ShaderSource) -> &mut Self {
-		self.layouts.extend(other.layouts);
-		self.groups.0.extend(other.groups.0);
+		self.buffers.0.extend(other.buffers.0);
 		self
 	}
 }
@@ -483,14 +465,13 @@ impl Display for ShaderSource {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		writeln!(
 			f,
-			"ShaderSource:\nsource: {}\nlayouts: {:?}\ngroups: {:?}",
-			&self.source, &self.layouts, &self.groups
+			"ShaderSource:\nsource: {}\nbuffers: {:?}",
+			&self.source, &self.buffers
 		)
 	}
 }
 
 pub struct CompiledShader {
 	pub shader_module: ShaderModule,
-	pub layouts: Vec<BindGroupLayout>,
-	pub groups: BindGroupMapping,
+	pub buffers: BufferMapping,
 }

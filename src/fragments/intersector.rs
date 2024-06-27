@@ -1,8 +1,10 @@
+// use pbr_tracer_derive::ShaderType;
+
 use pbr_tracer_derive::ShaderStruct;
 
 use super::shader_fragments::ShaderFragment;
 use crate::core::{
-	buffer::{BufferUploadable, ShaderStruct, Uniform, WgslType},
+	buffer::{ShaderType, Uniform},
 	shader::{Shader, ShaderBuilder},
 };
 
@@ -43,11 +45,10 @@ impl ShaderFragment for Raymarcher {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
 			.include_path("raymarch/raymarch.wgsl")
-			.include_struct::<RaymarchSettings>()
-			.include_buffer(
-				Uniform::<RaymarchSettings>::new("settings"),
-				RaymarchSettings::default(),
-			)
+			.include_storage::<RaymarchSettings>(Uniform {
+				data: RaymarchSettings::default(),
+				var_name: "settings".to_owned(),
+			})
 			.into()
 	}
 }

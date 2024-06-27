@@ -20,35 +20,23 @@ pub fn shader_struct_derive(input: TokenStream) -> TokenStream {
 				let field_name = f.ident.expect("All struct fields need an identifier");
 				let field_type = f.ty;
 
-				quote!(format!("{}: {}", stringify!(#field_name), <#field_type as WgslType>::name()),)
+				quote!(format!("{}: {}", stringify!(#field_name), <#field_type as ShaderType>::type_name()),)
 			});
 
 			quote! {
-				impl ShaderStruct for #name {
-					fn get_source_code() -> String {
-						format!(
+				impl ShaderType for #name {
+					fn type_name() -> String {
+						stringify!(#name).to_string()
+					}
+
+					fn struct_definition() -> Option<String> {
+						Some(format!(
 							r#"
 								struct {struct_name} {{
 									{fields}
 								}};
 							"#, struct_name=stringify!(#name), fields=vec![#(#fields)*].join(",")
-						)
-					}
-				}
-
-				impl BufferUploadable for #name {
-					fn get_size(&self) -> u64 {
-						std::mem::size_of::<Self>() as u64
-					}
-
-					fn get_data(&self) -> Vec<u8> {
-						bytemuck::bytes_of(self).to_owned()
-					}
-				}
-
-				impl WgslType for #name {
-					fn name() -> String {
-						stringify!(#name).to_string()
+						))
 					}
 				}
 			}
