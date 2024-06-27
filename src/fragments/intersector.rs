@@ -1,11 +1,8 @@
-use std::mem;
-
-use brainrot::bevy;
-use pbr_tracer_derive::UniformBuffer;
+use pbr_tracer_derive::ShaderStruct;
 
 use super::shader_fragments::ShaderFragment;
 use crate::core::{
-	buffer::{Bufferable, UniformBuffer, WgslType},
+	buffer::{BufferUploadable, ShaderStruct, Uniform, WgslType},
 	shader::{Shader, ShaderBuilder},
 };
 
@@ -22,7 +19,7 @@ pub trait Intersector: ShaderFragment {}
 pub struct Raymarcher;
 
 #[repr(C)]
-#[derive(UniformBuffer, bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug, PartialEq)]
+#[derive(ShaderStruct, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug, PartialEq)]
 pub struct RaymarchSettings {
 	epsilon: f32,
 	min_march: f32,
@@ -46,7 +43,11 @@ impl ShaderFragment for Raymarcher {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
 			.include_path("raymarch/raymarch.wgsl")
-			.include_uniform("settings", RaymarchSettings::default())
+			.include_struct::<RaymarchSettings>()
+			.include_buffer(
+				Uniform::<RaymarchSettings>::new("settings"),
+				RaymarchSettings::default(),
+			)
 			.into()
 	}
 }

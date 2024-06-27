@@ -8,3 +8,4 @@ pub mod gpu;
 pub mod render_target;
 pub mod rendering;
 pub mod shader;
+pub mod smart_arc;

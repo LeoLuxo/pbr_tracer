@@ -1,5 +1,6 @@
 use bevy_ecs::{
 	event::EventReader,
+	query::With,
 	schedule::IntoSystemConfigs,
 	system::{Query, Res, ResMut},
 };
@@ -7,6 +8,7 @@ use brainrot::{
 	bevy::{self, App, Plugin},
 	ScreenSize,
 };
+use pbr_tracer_derive::ShaderStruct;
 use velcro::vec;
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -20,7 +22,7 @@ use wgpu::{
 use super::compute::ComputeRenderer;
 use crate::{
 	core::{
-		buffer::{self, SizedUniformBuffer},
+		buffer::{self, Buffer, BufferUploadable, ShaderStruct, Uniform, WgslType},
 		event_processing::{EventReaderProcessor, ProcessedChangeEvents},
 		events::WindowResizedEvent,
 		gameloop::{Render, Update},
@@ -45,22 +47,25 @@ impl Plugin for CompositeRendererPlugin {
 		let render_target = app.world.resource::<RenderTarget>();
 		let computer_renderer = app.world.resource::<ComputeRenderer>();
 
-		let viewport_buffer = (
-			ViewportInfo {
-				size: render_target.size,
-			},
-			SizedUniformBuffer::<ViewportInfo>::new(&gpu.device, "viewport", ShaderStages::FRAGMENT),
+		let viewport_info = ViewportInfo {
+			size: render_target.size,
+		};
+		let viewport_buffer = Buffer::new(
+			gpu,
+			ShaderStages::FRAGMENT,
+			viewport_info.get_size(),
+			&<Uniform<ViewportInfo>>::new("viewport_size"),
 		);
 
 		let composite_renderer = CompositeRenderer::new(
 			gpu,
 			render_target,
 			computer_renderer,
-			vec![&viewport_buffer.1.bind_group_layout],
+			vec![&viewport_buffer.bind_group_layout],
 		);
 
-		buffer::register_uniform::<ViewportInfo>(app);
-		app.world.spawn(viewport_buffer);
+		buffer::register_uniform_auto_update::<ViewportInfo>(app);
+		app.world.spawn((viewport_info, viewport_buffer));
 
 		app.world.insert_resource(composite_renderer);
 
@@ -79,7 +84,7 @@ pub struct CompositeRenderPass;
 */
 
 #[repr(C)]
-#[derive(bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug)]
+#[derive(ShaderStruct, bevy::Component, bytemuck::Pod, bytemuck::Zeroable, Copy, Clone, Debug)]
 pub struct ViewportInfo {
 	pub size: ScreenSize,
 }
@@ -103,7 +108,7 @@ impl CompositeRenderer {
 		// 	.create_shader_module(include_wgsl!(src!("shader/composite.wgsl")));
 		let shader = ShaderBuilder::new()
 			.include_path("composite.wgsl")
-			.build(gpu, &ShaderAssets, 1)
+			.build(gpu, &ShaderAssets, ShaderStages::FRAGMENT, 1)
 			.expect("Couldn't build shader");
 
 		// Textures and buffers need both a bind group *layout* and a bind group.
@@ -228,7 +233,7 @@ fn render(
 	composite_renderer: Res<CompositeRenderer>,
 	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
-	q: Query<&SizedUniformBuffer<ViewportInfo>>,
+	q: Query<&Buffer, With<ViewportInfo>>,
 ) {
 	// trace!("Rendering terrain");
 

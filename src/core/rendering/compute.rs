@@ -49,7 +49,7 @@ where
 		let shader = ShaderBuilder::new()
 			.include_path("compute.wgsl")
 			.include(self.renderer.shader())
-			.build(gpu, &ShaderAssets, 1)
+			.build(gpu, &ShaderAssets, ShaderStages::COMPUTE, 1)
 			.expect("Couldn't build shader");
 
 		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, shader);

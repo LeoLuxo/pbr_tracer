@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet, fmt::Display, hash::Hash, mem, ops::Range};
+use std::{borrow::Cow, collections::HashSet, fmt::Display, hash::Hash, mem, ops::Range, sync::Arc};
 
 use anyhow::{anyhow, Ok, Result};
 use brainrot::{path, root, rooted_path};
@@ -14,9 +14,10 @@ use velcro::{hash_map, iter};
 use wgpu::{BindGroup, BindGroupLayout, Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{self, BindGroupMapping, Bufferable, UniformBufferArc},
+	buffer::{BindGroupMapping, Buffer, BufferDataType, BufferType, BufferUploadable, ShaderStruct},
 	embed::Assets,
 	gpu::Gpu,
+	smart_arc::SmartArc,
 };
 
 /*
@@ -45,11 +46,21 @@ impl ShaderBuilder {
 		self.include(path.into())
 	}
 
-	pub fn include_uniform(&mut self, name: impl Into<String>, uniform: impl Bufferable) -> &mut Self {
-		let name = name.into();
-		let arc = UniformBufferArc::new(uniform);
-		self.include(Shader::Uniform { name, arc });
-		self
+	pub fn include_struct<S>(&mut self) -> &mut Self
+	where
+		S: ShaderStruct,
+	{
+		self.include(S::get_source_code())
+	}
+
+	pub fn include_buffer<B, D>(&mut self, buffer_type: B, data: D) -> &mut Self
+	where
+		B: BufferType + 'static,
+		D: BufferDataType<B> + 'static,
+	{
+		let buffer_type = SmartArc(Arc::new(buffer_type) as Arc<dyn BufferType>);
+		let data = SmartArc(Arc::new(data) as Arc<dyn BufferUploadable>);
+		self.include(Shader::Buffer { buffer_type, data })
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -61,8 +72,14 @@ impl ShaderBuilder {
 		self
 	}
 
-	pub fn build<T: Assets>(&mut self, gpu: &Gpu, shader_map: &T, bind_group_offset: u32) -> Result<CompiledShader> {
-		let shader_source = self.build_source(gpu, shader_map, bind_group_offset)?;
+	pub fn build<T: Assets>(
+		&mut self,
+		gpu: &Gpu,
+		shader_map: &T,
+		shader_stages: ShaderStages,
+		bind_group_offset: u32,
+	) -> Result<CompiledShader> {
+		let shader_source = self.build_source(gpu, shader_map, shader_stages, bind_group_offset)?;
 		println!("{}", shader_source);
 
 		let compiled_shader = shader_source.build(&gpu.device);
@@ -73,9 +90,10 @@ impl ShaderBuilder {
 		&mut self,
 		gpu: &Gpu,
 		shader_map: &T,
+		shader_stages: ShaderStages,
 		bind_group_offset: u32,
 	) -> Result<ShaderSource> {
-		let mut state = ShaderBuilderState::new(gpu, shader_map, bind_group_offset);
+		let mut state = ShaderBuilderState::new(gpu, shader_map, shader_stages, bind_group_offset);
 		self.build_source_from_state(&mut state)
 	}
 
@@ -149,15 +167,22 @@ impl ShaderBuilder {
 struct ShaderBuilderState<'a> {
 	pub gpu: &'a Gpu,
 	pub shader_map: &'a dyn Assets,
+	pub shader_stages: ShaderStages,
 	pub blacklist: HashSet<Shader>,
 	pub bind_group_offset: u32,
 }
 
 impl<'a> ShaderBuilderState<'a> {
-	pub fn new<T: Assets>(gpu: &'a Gpu, shader_map: &'a T, bind_group_offset: u32) -> Self {
+	pub fn new<T: Assets>(
+		gpu: &'a Gpu,
+		shader_map: &'a T,
+		shader_stages: ShaderStages,
+		bind_group_offset: u32,
+	) -> Self {
 		Self {
 			gpu,
 			blacklist: HashSet::new(),
+			shader_stages,
 			bind_group_offset,
 			shader_map: shader_map as &'a dyn Assets,
 		}
@@ -175,7 +200,10 @@ pub enum Shader {
 	Source(String),
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
-	Uniform { name: String, arc: UniformBufferArc },
+	Buffer {
+		buffer_type: SmartArc<dyn BufferType>,
+		data: SmartArc<dyn BufferUploadable>,
+	},
 }
 
 impl Shader {
@@ -184,7 +212,7 @@ impl Shader {
 			Shader::Source(_) => root!(),
 			Shader::Path(path) => path.parent().map(|x| x.to_owned()).unwrap_or(root!()),
 			Shader::Builder(_) => root!(),
-			Shader::Uniform { .. } => root!(),
+			Shader::Buffer { .. } => root!(),
 		}
 	}
 
@@ -206,7 +234,7 @@ impl Shader {
 			// Add a define directive to the ShaderBuilder
 			Shader::Builder(mut builder) => builder.define(from, to).into(),
 			// Nothing to change in a uniform
-			Shader::Uniform { .. } => self_,
+			Shader::Buffer { .. } => self_,
 		});
 
 		obfuscated
@@ -230,18 +258,23 @@ impl Shader {
 				Ok(ShaderSource::from_source(source))
 			}
 			Shader::Builder(mut builder) => builder.build_source_from_state(state),
-			Shader::Uniform { name, arc } => {
-				let struct_source = arc.get_source_code(state.bind_group_offset, 0, &name);
+			Shader::Buffer { buffer_type, data } => {
+				let source = buffer_type.get_source_code(state.bind_group_offset, 0);
 
-				let buffer = buffer::create_buffer(state.gpu, &name, arc.get_size());
-				let bind_group_layout = buffer::create_bind_group_layout(state.gpu, &name, ShaderStages::COMPUTE);
-				let bind_group = buffer::create_bind_group(state.gpu, &name, &buffer, &bind_group_layout);
+				// println!("\n\nsource of the buffer: {}\n", source);
 
-				let shader_source =
-					ShaderSource::from_buffer(struct_source, bind_group_layout, bind_group, state.bind_group_offset);
+				let buffer = Buffer::new(state.gpu, state.shader_stages, data.get_size(), buffer_type.as_ref());
+
+				buffer.upload_bytes(state.gpu, &data.get_data(), 0);
+
+				let shader_source = ShaderSource::from_buffer(
+					source,
+					buffer.bind_group_layout,
+					buffer.bind_group,
+					state.bind_group_offset,
+				);
 
 				state.bind_group_offset += 1;
-				buffer::upload_buffer_bytes(state.gpu, &buffer, &arc.get_data());
 
 				Ok(shader_source)
 			}
@@ -267,7 +300,7 @@ impl Shader {
 		let mut byte_offset: isize = 0;
 		let mut includes = Vec::<(String, Range<usize>)>::new();
 
-		println!("RECURSIVE:\n{}\n======", shader_source);
+		// println!("RECURSIVE:\n{}\n======", shader_source);
 
 		// Find all `#include "path/to/shader.wgsl"` in the source
 		let re = Regex::new(r#"(?m)^#include "(.+?)""#).unwrap();
@@ -286,7 +319,7 @@ impl Shader {
 			// Offset the range by byte_offset
 			let range = (range.start as isize + byte_offset) as usize..(range.end as isize + byte_offset) as usize;
 
-			println!("{:?}", range);
+			// println!("{:?}", range);
 
 			// Fix up the path
 			let path_relative: Utf8UnixPathBuf = path!(&path_str)
