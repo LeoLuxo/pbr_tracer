@@ -14,9 +14,7 @@ use velcro::{hash_map, iter};
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{
-		uniform::Uniform, BufferMapping, DataBuffer, DataBufferBounds, DataBufferDescriptor, ShaderBuffer, ShaderType,
-	},
+	buffer::{BufferMapping, DataBuffer, DataBufferDescriptor, ShaderBuffer},
 	embed::Assets,
 	smart_arc::SmartArc,
 };
@@ -48,26 +46,14 @@ impl ShaderBuilder {
 		self.include(path.into())
 	}
 
-	pub fn include_uniform_buffer<T>(&mut self, var_name: impl Into<String>, data: T) -> &mut Self
-	where
-		T: DataBufferBounds + 'static,
-	{
-		if let Some(struct_source_code) = <T as ShaderType>::struct_definition() {
-			self.include(Shader::Source(struct_source_code));
+	pub fn include_data_buffer(&mut self, data_buffer: impl DataBufferDescriptor + 'static) -> &mut Self {
+		if let Some(other_source_code) = data_buffer.other_source_code() {
+			self.include(Shader::Source(other_source_code));
 		}
 
-		let uniform = Uniform::new(var_name, data);
-
 		self.include(Shader::DataBuffer(SmartArc(
-			Arc::new(uniform) as Arc<dyn DataBufferDescriptor>
+			Arc::new(data_buffer) as Arc<dyn DataBufferDescriptor>
 		)))
-	}
-
-	pub fn include_storage_buffer<T>(&mut self, storage: impl DataBufferDescriptor + 'static) -> &mut Self
-	where
-		T: DataBufferBounds,
-	{
-		todo!()
 	}
 
 	pub fn include_texture(&mut self) -> &mut Self {

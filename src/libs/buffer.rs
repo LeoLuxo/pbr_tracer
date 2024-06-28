@@ -1,3 +1,4 @@
+pub mod storage;
 pub mod uniform;
 
 use std::{collections::HashMap, mem};
@@ -90,6 +91,7 @@ pub trait ShaderBuffer {
 pub trait ShaderBufferDescriptor {
 	fn label(&self, label_type: &str) -> String;
 	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String;
+	fn other_source_code(&self) -> Option<String>;
 	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout;
 	fn create_bind_group(&self, gpu: &Gpu, binding_resource: BindingResource, layout: &BindGroupLayout) -> BindGroup;
 }
