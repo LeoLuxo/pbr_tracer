@@ -96,20 +96,28 @@ impl<T: DataBufferBounds, const READ_ONLY: bool> ShaderBufferDescriptor for Stor
 
 impl<T: DataBufferBounds> DataBufferDescriptor for Storage<T> {
 	fn create_backing(&self, gpu: &Gpu) -> DataBufferBacking {
-		let buffer = gpu.device.create_buffer(&BufferDescriptor {
-			label: Some(&self.label("Buffer")),
-			size: match &self.data {
-				StorageData::Size(size) => *size,
-				StorageData::Data(data) => data.get_size(),
-			},
-			usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-			mapped_at_creation: false,
-		});
+		let buffer = match &self.backing {
+			Backing::CreateNew => {
+				let buffer = gpu.device.create_buffer(&BufferDescriptor {
+					label: Some(&self.label("Buffer")),
+					size: match &self.data {
+						StorageData::Size(size) => *size,
+						StorageData::Data(data) => data.get_size(),
+					},
+					usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+					mapped_at_creation: false,
+				});
+
+				SmartArc::new(buffer)
+			}
+
+			Backing::From(buffer) => buffer.clone(),
+		};
 
 		if let StorageData::Data(data) = &self.data {
 			upload_bytes_to_buffer(gpu, &buffer, &data.get_bytes(), 0);
 		}
 
-		SmartArc::new(buffer)
+		buffer
 	}
 }
