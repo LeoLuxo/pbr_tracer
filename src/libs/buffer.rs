@@ -1,3 +1,5 @@
+pub mod uniform;
+
 use std::{collections::HashMap, mem};
 
 use bevy_ecs::system::{Query, Res};
@@ -5,11 +7,7 @@ use brainrot::{
 	bevy::{self, App},
 	vek,
 };
-use wgpu::{
-	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages,
-	ComputePass, RenderPass, ShaderStages,
-};
+use wgpu::{BindGroup, BindGroupLayout, BindingResource, Buffer, BufferAddress, ComputePass, RenderPass, ShaderStages};
 
 use super::smart_arc::SmartArc;
 use crate::core::{gameloop::PreRender, gpu::Gpu};
@@ -102,74 +100,6 @@ pub trait DataBufferDescriptor: ShaderBufferDescriptor {
 
 pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
 	// fn create_texture(&self, gpu: &Gpu) -> Buffer;
-}
-
-/*
---------------------------------------------------------------------------------
-||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
---------------------------------------------------------------------------------
-*/
-
-pub struct Uniform<T: DataBufferBounds> {
-	pub var_name: String,
-	pub data: T,
-}
-
-impl<T: DataBufferBounds> ShaderBufferDescriptor for Uniform<T> {
-	fn label(&self, label_type: &str) -> String {
-		format!("{} <{}> {}", self.var_name, <T as ShaderType>::type_name(), label_type)
-	}
-
-	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String {
-		format!(
-			"@group({}) @binding({}) var<uniform> {}: {};",
-			group,
-			binding_offset,
-			self.var_name,
-			<T as ShaderType>::type_name()
-		)
-	}
-
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout {
-		gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-			entries: &[BindGroupLayoutEntry {
-				binding: 0,
-				visibility,
-				ty: BindingType::Buffer {
-					ty: BufferBindingType::Uniform,
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			}],
-			label: Some(&self.label("Bind Group Layout")),
-		})
-	}
-
-	fn create_bind_group(&self, gpu: &Gpu, binding_resource: BindingResource, layout: &BindGroupLayout) -> BindGroup {
-		gpu.device.create_bind_group(&BindGroupDescriptor {
-			layout,
-			entries: &[BindGroupEntry {
-				binding: 0,
-				resource: binding_resource,
-			}],
-			label: Some(&self.label("Bind Group")),
-		})
-	}
-}
-
-impl<T: DataBufferBounds> DataBufferDescriptor for Uniform<T> {
-	fn create_buffer(&self, gpu: &Gpu) -> Buffer {
-		let buffer = gpu.device.create_buffer(&BufferDescriptor {
-			label: Some(&self.label("Buffer")),
-			size: self.data.get_size(),
-			usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-			mapped_at_creation: false,
-		});
-
-		upload_bytes_to_buffer(gpu, &buffer, &self.data.get_bytes(), 0);
-		buffer
-	}
 }
 
 /*

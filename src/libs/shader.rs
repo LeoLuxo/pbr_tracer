@@ -14,7 +14,9 @@ use velcro::{hash_map, iter};
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{BufferMapping, DataBuffer, DataBufferBounds, DataBufferDescriptor, ShaderBuffer, ShaderType, Uniform},
+	buffer::{
+		uniform::Uniform, BufferMapping, DataBuffer, DataBufferBounds, DataBufferDescriptor, ShaderBuffer, ShaderType,
+	},
 	embed::Assets,
 	smart_arc::SmartArc,
 };
@@ -54,8 +56,7 @@ impl ShaderBuilder {
 			self.include(Shader::Source(struct_source_code));
 		}
 
-		let var_name = var_name.into();
-		let uniform = Uniform { var_name, data };
+		let uniform = Uniform::new(var_name, data);
 
 		self.include(Shader::DataBuffer(SmartArc(
 			Arc::new(uniform) as Arc<dyn DataBufferDescriptor>

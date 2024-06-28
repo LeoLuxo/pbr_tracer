@@ -29,7 +29,7 @@ use crate::{
 		render_target::RenderTarget,
 	},
 	libs::{
-		buffer::{self, DataBuffer, ShaderType, Uniform},
+		buffer::{self, uniform::Uniform, DataBuffer, ShaderType},
 		shader::ShaderBuilder,
 	},
 	ShaderAssets,
@@ -55,10 +55,7 @@ impl Plugin for CompositeRendererPlugin {
 		let viewport_buffer = DataBuffer::new(
 			gpu,
 			ShaderStages::FRAGMENT,
-			&Uniform {
-				data: viewport_info,
-				var_name: "viewport_size".to_string(),
-			},
+			&Uniform::new("viewport_size", viewport_info),
 		);
 
 		let composite_renderer = CompositeRenderer::new(
