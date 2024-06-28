@@ -3,7 +3,7 @@
 use pbr_tracer_derive::ShaderStruct;
 
 use crate::libs::{
-	buffer::{ShaderType, Uniform},
+	buffer::ShaderType,
 	shader::{Shader, ShaderBuilder},
 	shader_fragment::ShaderFragment,
 };
@@ -45,10 +45,7 @@ impl ShaderFragment for Raymarcher {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
 			.include_path("raymarch/raymarch.wgsl")
-			.include_storage::<RaymarchSettings>(Uniform {
-				data: RaymarchSettings::default(),
-				var_name: "settings".to_owned(),
-			})
+			.include_uniform_buffer("settings", RaymarchSettings::default())
 			.into()
 	}
 }

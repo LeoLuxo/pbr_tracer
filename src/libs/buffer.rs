@@ -48,7 +48,7 @@ pub trait ShaderType {
 // Incompatible:
 // impl WgslType for f16 {fn name() -> String {format!("f16")}}
 
-pub trait BufferUploadable: std::fmt::Debug {
+pub trait DataBufferUploadable: std::fmt::Debug {
 	fn get_size(&self) -> u64;
 	fn get_bytes(&self) -> Vec<u8>;
 	fn type_name(&self) -> String;
@@ -56,7 +56,7 @@ pub trait BufferUploadable: std::fmt::Debug {
 }
 
 // This blanket impl excludes [E]
-impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> BufferUploadable for T {
+impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> DataBufferUploadable for T {
 	fn get_size(&self) -> u64 {
 		mem::size_of::<Self>() as u64
 	}
@@ -80,8 +80,8 @@ impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> BufferUploadable f
 --------------------------------------------------------------------------------
 */
 
-pub trait StorageBufferBounds: BufferUploadable + ShaderType {}
-impl<T: BufferUploadable + ShaderType> StorageBufferBounds for T {}
+pub trait DataBufferBounds: DataBufferUploadable + ShaderType {}
+impl<T: DataBufferUploadable + ShaderType> DataBufferBounds for T {}
 
 pub trait ShaderBuffer {
 	fn bind_group_layout(&self) -> &BindGroupLayout;
@@ -96,7 +96,7 @@ pub trait ShaderBufferDescriptor {
 	fn create_bind_group(&self, gpu: &Gpu, binding_resource: BindingResource, layout: &BindGroupLayout) -> BindGroup;
 }
 
-pub trait StorageBufferDescriptor: ShaderBufferDescriptor {
+pub trait DataBufferDescriptor: ShaderBufferDescriptor {
 	fn create_buffer(&self, gpu: &Gpu) -> Buffer;
 }
 
@@ -110,12 +110,12 @@ pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
 --------------------------------------------------------------------------------
 */
 
-pub struct Uniform<T: StorageBufferBounds> {
+pub struct Uniform<T: DataBufferBounds> {
 	pub var_name: String,
 	pub data: T,
 }
 
-impl<T: StorageBufferBounds> ShaderBufferDescriptor for Uniform<T> {
+impl<T: DataBufferBounds> ShaderBufferDescriptor for Uniform<T> {
 	fn label(&self, label_type: &str) -> String {
 		format!("{} <{}> {}", self.var_name, <T as ShaderType>::type_name(), label_type)
 	}
@@ -158,7 +158,7 @@ impl<T: StorageBufferBounds> ShaderBufferDescriptor for Uniform<T> {
 	}
 }
 
-impl<T: StorageBufferBounds> StorageBufferDescriptor for Uniform<T> {
+impl<T: DataBufferBounds> DataBufferDescriptor for Uniform<T> {
 	fn create_buffer(&self, gpu: &Gpu) -> Buffer {
 		let buffer = gpu.device.create_buffer(&BufferDescriptor {
 			label: Some(&self.label("Buffer")),
@@ -179,19 +179,19 @@ impl<T: StorageBufferBounds> StorageBufferDescriptor for Uniform<T> {
 */
 
 #[derive(bevy::Component, Debug)]
-pub struct StorageBuffer {
+pub struct DataBuffer {
 	pub buffer: Buffer,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
 }
 
-impl StorageBuffer {
-	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn StorageBufferDescriptor) -> Self {
+impl DataBuffer {
+	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn DataBufferDescriptor) -> Self {
 		let buffer = shader_buffer.create_buffer(gpu);
 		let bind_group_layout = shader_buffer.create_bind_group_layout(gpu, visibility);
 		let bind_group = shader_buffer.create_bind_group(gpu, buffer.as_entire_binding(), &bind_group_layout);
 
-		StorageBuffer {
+		DataBuffer {
 			buffer,
 			bind_group_layout,
 			bind_group,
@@ -199,7 +199,7 @@ impl StorageBuffer {
 	}
 }
 
-impl ShaderBuffer for StorageBuffer {
+impl ShaderBuffer for DataBuffer {
 	fn bind_group_layout(&self) -> &BindGroupLayout {
 		&self.bind_group_layout
 	}
@@ -252,14 +252,14 @@ impl<'a> BufferMapping {
 
 pub fn register_uniform_auto_update<T>(app: &mut App)
 where
-	T: BufferUploadable + bevy::Component + Send + Sync,
+	T: DataBufferUploadable + bevy::Component + Send + Sync,
 {
 	app.add_systems(PreRender, upload_buffers_system::<T>);
 }
 
-fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &StorageBuffer)>)
+fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &DataBuffer)>)
 where
-	T: BufferUploadable + bevy::Component + Send + Sync,
+	T: DataBufferUploadable + bevy::Component + Send + Sync,
 {
 	for (data, buffer) in q.iter() {
 		buffer.upload_bytes(&gpu, &data.get_bytes(), 0);

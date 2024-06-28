@@ -14,7 +14,7 @@ use velcro::{hash_map, iter};
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{BufferMapping, ShaderBuffer, ShaderType, StorageBuffer, StorageBufferBounds, StorageBufferDescriptor},
+	buffer::{BufferMapping, DataBuffer, DataBufferBounds, DataBufferDescriptor, ShaderBuffer, ShaderType, Uniform},
 	embed::Assets,
 	smart_arc::SmartArc,
 };
@@ -46,17 +46,27 @@ impl ShaderBuilder {
 		self.include(path.into())
 	}
 
-	pub fn include_storage<T>(&mut self, storage: impl StorageBufferDescriptor + 'static) -> &mut Self
+	pub fn include_uniform_buffer<T>(&mut self, var_name: impl Into<String>, data: T) -> &mut Self
 	where
-		T: StorageBufferBounds,
+		T: DataBufferBounds + 'static,
 	{
 		if let Some(struct_source_code) = <T as ShaderType>::struct_definition() {
 			self.include(Shader::Source(struct_source_code));
 		}
 
-		self.include(Shader::StorageBuffer(SmartArc(
-			Arc::new(storage) as Arc<dyn StorageBufferDescriptor>
+		let var_name = var_name.into();
+		let uniform = Uniform { var_name, data };
+
+		self.include(Shader::DataBuffer(SmartArc(
+			Arc::new(uniform) as Arc<dyn DataBufferDescriptor>
 		)))
+	}
+
+	pub fn include_storage_buffer<T>(&mut self, storage: impl DataBufferDescriptor + 'static) -> &mut Self
+	where
+		T: DataBufferBounds,
+	{
+		todo!()
 	}
 
 	pub fn include_texture(&mut self) -> &mut Self {
@@ -200,7 +210,7 @@ pub enum Shader {
 	Source(String),
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
-	StorageBuffer(SmartArc<dyn StorageBufferDescriptor>),
+	DataBuffer(SmartArc<dyn DataBufferDescriptor>),
 }
 
 impl Shader {
@@ -209,7 +219,7 @@ impl Shader {
 			Shader::Source(_) => root!(),
 			Shader::Path(path) => path.parent().map(|x| x.to_owned()).unwrap_or(root!()),
 			Shader::Builder(_) => root!(),
-			Shader::StorageBuffer(_) => root!(),
+			Shader::DataBuffer(_) => root!(),
 		}
 	}
 
@@ -231,7 +241,7 @@ impl Shader {
 			// Add a define directive to the ShaderBuilder
 			Shader::Builder(mut builder) => builder.define(from, to).into(),
 			// Nothing to change in a uniform
-			Shader::StorageBuffer(_) => self_,
+			Shader::DataBuffer(_) => self_,
 		});
 
 		obfuscated
@@ -255,9 +265,9 @@ impl Shader {
 				Ok(ShaderSource::from_source(source))
 			}
 			Shader::Builder(mut builder) => builder.build_source_from_state(state),
-			Shader::StorageBuffer(buffer) => {
+			Shader::DataBuffer(buffer) => {
 				let source = buffer.binding_source_code(state.bind_group_offset, 0);
-				let buffer = StorageBuffer::new(state.gpu, state.shader_stages, buffer.as_ref());
+				let buffer = DataBuffer::new(state.gpu, state.shader_stages, buffer.as_ref());
 				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
 				state.bind_group_offset += 1;

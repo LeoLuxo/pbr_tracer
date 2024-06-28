@@ -29,7 +29,7 @@ use crate::{
 		render_target::RenderTarget,
 	},
 	libs::{
-		buffer::{self, ShaderType, StorageBuffer, Uniform},
+		buffer::{self, DataBuffer, ShaderType, Uniform},
 		shader::ShaderBuilder,
 	},
 	ShaderAssets,
@@ -52,7 +52,7 @@ impl Plugin for CompositeRendererPlugin {
 		let viewport_info = ViewportInfo {
 			size: render_target.size,
 		};
-		let viewport_buffer = StorageBuffer::new(
+		let viewport_buffer = DataBuffer::new(
 			gpu,
 			ShaderStages::FRAGMENT,
 			&Uniform {
@@ -237,7 +237,7 @@ fn render(
 	composite_renderer: Res<CompositeRenderer>,
 	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
-	q: Query<&StorageBuffer, With<ViewportInfo>>,
+	q: Query<&DataBuffer, With<ViewportInfo>>,
 ) {
 	// trace!("Rendering terrain");
 
