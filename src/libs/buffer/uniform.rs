@@ -1,10 +1,15 @@
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ShaderStages,
+	BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsages, ShaderStages,
 };
 
-use super::{upload_bytes_to_buffer, DataBufferBounds, DataBufferDescriptor, ShaderBufferDescriptor};
-use crate::{core::gpu::Gpu, libs::buffer::ShaderType};
+use super::{
+	upload_bytes_to_buffer, Backing, DataBufferBacking, DataBufferBounds, DataBufferDescriptor, ShaderBufferDescriptor,
+};
+use crate::{
+	core::gpu::Gpu,
+	libs::{buffer::ShaderType, smart_arc::SmartArc},
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -15,6 +20,7 @@ use crate::{core::gpu::Gpu, libs::buffer::ShaderType};
 pub struct Uniform<T: DataBufferBounds> {
 	pub var_name: String,
 	pub data: T,
+	pub backing: Backing<DataBufferBacking>,
 }
 
 impl<T: DataBufferBounds> Uniform<T> {
@@ -22,6 +28,15 @@ impl<T: DataBufferBounds> Uniform<T> {
 		Self {
 			var_name: var_name.into(),
 			data,
+			backing: Backing::CreateNew,
+		}
+	}
+
+	pub fn from_backing(var_name: impl Into<String>, data: T, backing: DataBufferBacking) -> Self {
+		Self {
+			var_name: var_name.into(),
+			data,
+			backing: Backing::From(backing),
 		}
 	}
 }
@@ -74,7 +89,7 @@ impl<T: DataBufferBounds> ShaderBufferDescriptor for Uniform<T> {
 }
 
 impl<T: DataBufferBounds> DataBufferDescriptor for Uniform<T> {
-	fn create_buffer(&self, gpu: &Gpu) -> Buffer {
+	fn create_backing(&self, gpu: &Gpu) -> DataBufferBacking {
 		let buffer = gpu.device.create_buffer(&BufferDescriptor {
 			label: Some(&self.label("Buffer")),
 			size: self.data.get_size(),
@@ -83,6 +98,7 @@ impl<T: DataBufferBounds> DataBufferDescriptor for Uniform<T> {
 		});
 
 		upload_bytes_to_buffer(gpu, &buffer, &self.data.get_bytes(), 0);
-		buffer
+
+		SmartArc::new(buffer)
 	}
 }

@@ -6,7 +6,7 @@ use std::{collections::HashMap, mem};
 use bevy_ecs::system::{Query, Res};
 use brainrot::{
 	bevy::{self, App},
-	vek,
+	vek, TextureAsset,
 };
 use wgpu::{BindGroup, BindGroupLayout, BindingResource, Buffer, BufferAddress, ComputePass, RenderPass, ShaderStages};
 
@@ -73,6 +73,11 @@ impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> DataBufferUploadab
 	}
 }
 
+pub enum Backing<T> {
+	CreateNew,
+	From(T),
+}
+
 /*
 --------------------------------------------------------------------------------
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -96,12 +101,15 @@ pub trait ShaderBufferDescriptor {
 	fn create_bind_group(&self, gpu: &Gpu, binding_resource: BindingResource, layout: &BindGroupLayout) -> BindGroup;
 }
 
+type DataBufferBacking = SmartArc<Buffer>;
+type TextureBufferResource = TextureAsset;
+
 pub trait DataBufferDescriptor: ShaderBufferDescriptor {
-	fn create_buffer(&self, gpu: &Gpu) -> Buffer;
+	fn create_backing(&self, gpu: &Gpu) -> DataBufferBacking;
 }
 
 pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
-	// fn create_texture(&self, gpu: &Gpu) -> Buffer;
+	fn create_backing(&self, gpu: &Gpu) -> DataBufferBacking;
 }
 
 /*
@@ -112,14 +120,14 @@ pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
 
 #[derive(bevy::Component, Debug)]
 pub struct DataBuffer {
-	pub buffer: Buffer,
+	pub buffer: SmartArc<Buffer>,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
 }
 
 impl DataBuffer {
 	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn DataBufferDescriptor) -> Self {
-		let buffer = shader_buffer.create_buffer(gpu);
+		let buffer = shader_buffer.create_backing(gpu);
 		let bind_group_layout = shader_buffer.create_bind_group_layout(gpu, visibility);
 		let bind_group = shader_buffer.create_bind_group(gpu, buffer.as_entire_binding(), &bind_group_layout);
 

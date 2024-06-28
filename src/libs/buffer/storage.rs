@@ -1,10 +1,15 @@
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ShaderStages,
+	BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferUsages, ShaderStages,
 };
 
-use super::{upload_bytes_to_buffer, DataBufferBounds, DataBufferDescriptor, ShaderBufferDescriptor};
-use crate::{core::gpu::Gpu, libs::buffer::ShaderType};
+use super::{
+	upload_bytes_to_buffer, Backing, DataBufferBacking, DataBufferBounds, DataBufferDescriptor, ShaderBufferDescriptor,
+};
+use crate::{
+	core::gpu::Gpu,
+	libs::{buffer::ShaderType, smart_arc::SmartArc},
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -15,6 +20,7 @@ use crate::{core::gpu::Gpu, libs::buffer::ShaderType};
 pub struct Storage<T: DataBufferBounds, const READ_ONLY: bool = false> {
 	pub var_name: String,
 	pub data: StorageData<T>,
+	pub backing: Backing<DataBufferBacking>,
 }
 
 pub enum StorageData<T> {
@@ -23,17 +29,19 @@ pub enum StorageData<T> {
 }
 
 impl<T: DataBufferBounds> Storage<T> {
-	pub fn with_size(var_name: impl Into<String>, size: u64) -> Self {
+	pub fn with_size(var_name: impl Into<String>, size: u64, backing: Backing<DataBufferBacking>) -> Self {
 		Self {
 			var_name: var_name.into(),
 			data: StorageData::Size(size),
+			backing,
 		}
 	}
 
-	pub fn with_data(var_name: impl Into<String>, data: T) -> Self {
+	pub fn with_data(var_name: impl Into<String>, data: T, backing: Backing<DataBufferBacking>) -> Self {
 		Self {
 			var_name: var_name.into(),
 			data: StorageData::Data(data),
+			backing,
 		}
 	}
 }
@@ -87,7 +95,7 @@ impl<T: DataBufferBounds, const READ_ONLY: bool> ShaderBufferDescriptor for Stor
 }
 
 impl<T: DataBufferBounds> DataBufferDescriptor for Storage<T> {
-	fn create_buffer(&self, gpu: &Gpu) -> Buffer {
+	fn create_backing(&self, gpu: &Gpu) -> DataBufferBacking {
 		let buffer = gpu.device.create_buffer(&BufferDescriptor {
 			label: Some(&self.label("Buffer")),
 			size: match &self.data {
@@ -102,6 +110,6 @@ impl<T: DataBufferBounds> DataBufferDescriptor for Storage<T> {
 			upload_bytes_to_buffer(gpu, &buffer, &data.get_bytes(), 0);
 		}
 
-		buffer
+		SmartArc::new(buffer)
 	}
 }
