@@ -16,9 +16,9 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 use super::{
 	buffer::{BufferMapping, ShaderBuffer, ShaderType, StorageBuffer, StorageBufferBounds, StorageBufferDescriptor},
 	embed::Assets,
-	gpu::Gpu,
 	smart_arc::SmartArc,
 };
+use crate::core::gpu::Gpu;
 
 /*
 --------------------------------------------------------------------------------

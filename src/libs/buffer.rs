@@ -11,7 +11,8 @@ use wgpu::{
 	ComputePass, RenderPass, ShaderStages,
 };
 
-use super::{gameloop::PreRender, gpu::Gpu, smart_arc::SmartArc};
+use super::smart_arc::SmartArc;
+use crate::core::{gameloop::PreRender, gpu::Gpu};
 
 /*
 --------------------------------------------------------------------------------

@@ -14,13 +14,11 @@ use wgpu::{
 };
 
 use crate::{
-	core::{
-		gameloop::Render,
-		gpu::Gpu,
-		render_target::RenderTarget,
+	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
+	libs::{
 		shader::{CompiledShader, ShaderBuilder},
+		shader_fragment::{Renderer, ShaderFragment},
 	},
-	fragments::shader_fragments::Renderer,
 	ShaderAssets,
 };
 
@@ -45,14 +43,7 @@ where
 
 		let gpu = app.world.resource::<Gpu>();
 
-		// Dynamically create shader from the renderer
-		let shader = ShaderBuilder::new()
-			.include_path("compute.wgsl")
-			.include(self.renderer.shader())
-			.build(gpu, &ShaderAssets, ShaderStages::COMPUTE, 1)
-			.expect("Couldn't build shader");
-
-		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, shader);
+		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, &self.renderer);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -77,7 +68,14 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new(gpu: &Gpu, resolution: ScreenSize, shader: CompiledShader) -> Self {
+	pub fn new(gpu: &Gpu, resolution: ScreenSize, renderer: &dyn ShaderFragment) -> Self {
+		// Dynamically create shader from the renderer
+		let shader = ShaderBuilder::new()
+			.include_path("compute.wgsl")
+			.include(renderer.shader())
+			.build(gpu, &ShaderAssets, ShaderStages::COMPUTE, 1)
+			.expect("Couldn't build shader");
+
 		// The output texture that the compute will write to
 		let output_texture = TextureAsset::create_storage_sampler_texture(
 			&gpu.device,

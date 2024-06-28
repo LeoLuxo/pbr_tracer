@@ -1,7 +1,7 @@
 use super::{intersector::Intersector, post_processing::PostProcessingPipeline};
-use crate::{
-	core::shader::{Shader, ShaderBuilder},
-	fragments::shader_fragments::{Renderer, ShaderFragment},
+use crate::libs::{
+	shader::{Shader, ShaderBuilder},
+	shader_fragment::{Renderer, ShaderFragment},
 };
 
 /*

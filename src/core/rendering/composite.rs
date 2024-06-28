@@ -22,12 +22,14 @@ use wgpu::{
 use super::compute::ComputeRenderer;
 use crate::{
 	core::{
-		buffer::{self, ShaderType, StorageBuffer, Uniform},
 		event_processing::{EventReaderProcessor, ProcessedChangeEvents},
 		events::WindowResizedEvent,
 		gameloop::{Render, Update},
 		gpu::Gpu,
 		render_target::RenderTarget,
+	},
+	libs::{
+		buffer::{self, ShaderType, StorageBuffer, Uniform},
 		shader::ShaderBuilder,
 	},
 	ShaderAssets,

@@ -1,11 +1,7 @@
-pub mod buffer;
 pub mod display;
-pub mod embed;
 pub mod event_processing;
 pub mod events;
 pub mod gameloop;
 pub mod gpu;
 pub mod render_target;
 pub mod rendering;
-pub mod shader;
-pub mod smart_arc;

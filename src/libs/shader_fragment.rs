@@ -1,4 +1,4 @@
-use crate::core::shader::Shader;
+use crate::libs::shader::Shader;
 
 /*
 --------------------------------------------------------------------------------

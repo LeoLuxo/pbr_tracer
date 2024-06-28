@@ -1,7 +1,9 @@
 use brainrot::path;
 
-use super::shader_fragments::ShaderFragment;
-use crate::core::shader::{Shader, ShaderBuilder};
+use crate::libs::{
+	shader::{Shader, ShaderBuilder},
+	shader_fragment::ShaderFragment,
+};
 
 /*
 --------------------------------------------------------------------------------

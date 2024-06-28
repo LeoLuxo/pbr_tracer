@@ -2,10 +2,10 @@
 
 use pbr_tracer_derive::ShaderStruct;
 
-use super::shader_fragments::ShaderFragment;
-use crate::core::{
+use crate::libs::{
 	buffer::{ShaderType, Uniform},
 	shader::{Shader, ShaderBuilder},
+	shader_fragment::ShaderFragment,
 };
 
 /*
