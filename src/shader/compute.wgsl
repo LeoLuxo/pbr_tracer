@@ -1,5 +1,5 @@
 
-@group(0) @binding(0) var out_texture: texture_storage_2d<rgba32float, read_write>;
+// @group(0) @binding(0) var out_texture: texture_storage_2d<rgba32float, read_write>;
 
 @compute
 @workgroup_size(1)

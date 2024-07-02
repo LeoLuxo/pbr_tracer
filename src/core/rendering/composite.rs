@@ -11,12 +11,10 @@ use brainrot::{
 use pbr_tracer_derive::ShaderStruct;
 use velcro::vec;
 use wgpu::{
-	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor,
-	FragmentState, FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode,
-	PrimitiveState, PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline,
-	RenderPipelineDescriptor, SamplerBindingType, ShaderStages, StoreOp, TextureSampleType, TextureViewDimension,
-	VertexState,
+	BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState,
+	FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
+	PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
+	ShaderStages, StoreOp, VertexState,
 };
 
 use super::compute::ComputeRenderer;
@@ -29,8 +27,11 @@ use crate::{
 		render_target::RenderTarget,
 	},
 	libs::{
-		buffer::{self, uniform::Uniform, DataBuffer, ShaderType},
-		shader::ShaderBuilder,
+		buffer::{
+			self, texture_sampler_buffer::TextureSamplerBuffer, uniform_buffer::UniformBuffer, GenericDataBuffer,
+			ShaderType,
+		},
+		shader::{CompiledShader, ShaderBuilder},
 	},
 	ShaderAssets,
 };
@@ -52,10 +53,10 @@ impl Plugin for CompositeRendererPlugin {
 		let viewport_info = ViewportInfo {
 			size: render_target.size,
 		};
-		let viewport_buffer = DataBuffer::new(
+		let viewport_buffer = GenericDataBuffer::new(
 			gpu,
 			ShaderStages::FRAGMENT,
-			&Uniform::new("viewport_size", viewport_info),
+			&UniformBuffer::from_data("viewport_size", viewport_info),
 		);
 
 		let composite_renderer = CompositeRenderer::new(
@@ -93,7 +94,7 @@ pub struct ViewportInfo {
 #[derive(bevy::Resource)]
 pub struct CompositeRenderer {
 	pipeline: RenderPipeline,
-	texture_bind_group: BindGroup,
+	shader: CompiledShader,
 }
 
 impl CompositeRenderer {
@@ -103,60 +104,17 @@ impl CompositeRenderer {
 		compute_renderer: &ComputeRenderer,
 		additional_layouts: Vec<&BindGroupLayout>,
 	) -> Self {
-		// Statically include the shader in the executable
-		// let shader = gpu
-		// 	.device
-		// 	.create_shader_module(include_wgsl!(src!("shader/composite.wgsl")));
 		let shader = ShaderBuilder::new()
+			.include_texture(TextureSamplerBuffer::new(
+				"out_texture",
+				"out_sampler",
+				buffer::texture_sampler_buffer::TextureBufferBacking::From(compute_renderer.output_texture.clone()),
+			))
 			.include_path("composite.wgsl")
 			.build(gpu, &ShaderAssets, ShaderStages::FRAGMENT, 1)
 			.expect("Couldn't build shader");
 
-		// Textures and buffers need both a bind group *layout* and a bind group.
-		// The bind group layout describes the layout of the data.
-		let texture_bind_group_layout = &gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-			entries: &[
-				BindGroupLayoutEntry {
-					binding: 0,
-					visibility: ShaderStages::FRAGMENT,
-					ty: BindingType::Texture {
-						multisampled: false,
-						view_dimension: TextureViewDimension::D2,
-						sample_type: TextureSampleType::Float { filterable: true },
-					},
-					count: None,
-				},
-				BindGroupLayoutEntry {
-					binding: 1,
-					visibility: ShaderStages::FRAGMENT,
-					// This should match the filterable field of the
-					// corresponding Texture entry above.
-					ty: BindingType::Sampler(SamplerBindingType::Filtering),
-					count: None,
-				},
-			],
-			label: Some("Composite bind group layout"),
-		});
-
-		// The bind group actually maps the shader variables to the data on the GPU
-		// memory. Multiple bind groups can be interchanged as long as they have the
-		// same bind group layout.
-		let texture_bind_group = gpu.device.create_bind_group(&BindGroupDescriptor {
-			layout: texture_bind_group_layout,
-			entries: &[
-				BindGroupEntry {
-					binding: 0,
-					resource: BindingResource::TextureView(&compute_renderer.output_texture.view),
-				},
-				BindGroupEntry {
-					binding: 1,
-					resource: BindingResource::Sampler(&compute_renderer.output_texture.sampler),
-				},
-			],
-			label: Some("Composite bind group"),
-		});
-
-		let bind_group_layouts = &vec![texture_bind_group_layout, ..additional_layouts];
+		let bind_group_layouts = &vec![..additional_layouts, ..shader.buffers.layouts()];
 
 		// Contains the bind group layouts that are needed in the pipeline
 		let render_pipeline_layout = gpu.device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -209,10 +167,7 @@ impl CompositeRenderer {
 			multiview: None,
 		});
 
-		Self {
-			pipeline,
-			texture_bind_group,
-		}
+		Self { pipeline, shader }
 	}
 }
 
@@ -234,7 +189,7 @@ fn render(
 	composite_renderer: Res<CompositeRenderer>,
 	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
-	q: Query<&DataBuffer, With<ViewportInfo>>,
+	q: Query<&GenericDataBuffer, With<ViewportInfo>>,
 ) {
 	// trace!("Rendering terrain");
 
@@ -273,8 +228,8 @@ fn render(
 
 		render_pass.set_pipeline(&composite_renderer.pipeline);
 
-		render_pass.set_bind_group(0, &composite_renderer.texture_bind_group, &[]);
-		render_pass.set_bind_group(1, &q.single().bind_group, &[]);
+		render_pass.set_bind_group(0, &q.single().bind_group, &[]);
+		composite_renderer.shader.buffers.apply_to_render_pass(&mut render_pass);
 
 		// Draw 2 fullscreen triangles
 		// 2 - 3

@@ -14,7 +14,10 @@ use velcro::{hash_map, iter};
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
-	buffer::{BufferMapping, DataBuffer, DataBufferDescriptor, ShaderBuffer},
+	buffer::{
+		BufferMapping, DataBufferDescriptor, GenericDataBuffer, GenericTextureBuffer, ShaderBuffer,
+		TextureBufferDescriptor,
+	},
 	embed::Assets,
 	smart_arc::SmartArc,
 };
@@ -56,8 +59,14 @@ impl ShaderBuilder {
 		)))
 	}
 
-	pub fn include_texture(&mut self) -> &mut Self {
-		todo!()
+	pub fn include_texture(&mut self, texture_buffer: impl TextureBufferDescriptor + 'static) -> &mut Self {
+		if let Some(other_source_code) = texture_buffer.other_source_code() {
+			self.include(Shader::Source(other_source_code));
+		}
+
+		self.include(Shader::TextureBuffer(SmartArc(
+			Arc::new(texture_buffer) as Arc<dyn TextureBufferDescriptor>
+		)))
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -198,6 +207,7 @@ pub enum Shader {
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
 	DataBuffer(SmartArc<dyn DataBufferDescriptor>),
+	TextureBuffer(SmartArc<dyn TextureBufferDescriptor>),
 }
 
 impl Shader {
@@ -207,6 +217,7 @@ impl Shader {
 			Shader::Path(path) => path.parent().map(|x| x.to_owned()).unwrap_or(root!()),
 			Shader::Builder(_) => root!(),
 			Shader::DataBuffer(_) => root!(),
+			Shader::TextureBuffer(_) => root!(),
 		}
 	}
 
@@ -229,6 +240,7 @@ impl Shader {
 			Shader::Builder(mut builder) => builder.define(from, to).into(),
 			// Nothing to change in a uniform
 			Shader::DataBuffer(_) => self_,
+			Shader::TextureBuffer(_) => self_,
 		});
 
 		obfuscated
@@ -237,6 +249,7 @@ impl Shader {
 	fn get_raw_source(self, state: &mut ShaderBuilderState) -> Result<ShaderSource> {
 		match self {
 			Shader::Source(source) => Ok(ShaderSource::from_source(source)),
+
 			Shader::Path(path) => {
 				let path = rooted_path!(path);
 
@@ -251,10 +264,22 @@ impl Shader {
 
 				Ok(ShaderSource::from_source(source))
 			}
+
 			Shader::Builder(mut builder) => builder.build_source_from_state(state),
-			Shader::DataBuffer(buffer) => {
-				let source = buffer.binding_source_code(state.bind_group_offset, 0);
-				let buffer = DataBuffer::new(state.gpu, state.shader_stages, buffer.as_ref());
+
+			Shader::DataBuffer(data_buffer) => {
+				let source = data_buffer.binding_source_code(state.bind_group_offset, 0);
+				let buffer = GenericDataBuffer::new(state.gpu, state.shader_stages, data_buffer.as_ref());
+				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
+
+				state.bind_group_offset += 1;
+
+				Ok(shader_source)
+			}
+
+			Shader::TextureBuffer(texture_buffer) => {
+				let source = texture_buffer.binding_source_code(state.bind_group_offset, 0);
+				let buffer = GenericTextureBuffer::new(state.gpu, state.shader_stages, texture_buffer.as_ref());
 				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
 				state.bind_group_offset += 1;
