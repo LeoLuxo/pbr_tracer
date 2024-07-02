@@ -7,7 +7,7 @@ use wgpu::{
 use super::{DataBufferDescriptor, DataBufferUploadable, ShaderBufferDescriptor};
 use crate::{
 	core::gpu::Gpu,
-	libs::{buffer::ShaderType, smart_arc::SmartArc},
+	libs::{buffer::ShaderType, smart_arc::Sarc},
 };
 
 /*
@@ -24,7 +24,7 @@ pub struct UniformBuffer<T: DataBufferUploadable + ShaderType> {
 pub enum UniformBufferBacking<T: DataBufferUploadable + ShaderType> {
 	NewSized(u64),
 	FromData(T),
-	FromBuffer(SmartArc<Buffer>),
+	FromBuffer(Sarc<Buffer>),
 }
 
 impl<T: DataBufferUploadable + ShaderType> UniformBuffer<T> {
@@ -42,7 +42,7 @@ impl<T: DataBufferUploadable + ShaderType> UniformBuffer<T> {
 		}
 	}
 
-	pub fn from_buffer(var_name: impl Into<String>, buffer: SmartArc<Buffer>) -> Self {
+	pub fn from_buffer(var_name: impl Into<String>, buffer: Sarc<Buffer>) -> Self {
 		Self {
 			var_name: var_name.into(),
 			backing: UniformBufferBacking::FromBuffer(buffer),
@@ -103,7 +103,7 @@ impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for UniformBuffe
 		})
 	}
 
-	fn create_buffer(&self, gpu: &Gpu) -> SmartArc<Buffer> {
+	fn create_buffer(&self, gpu: &Gpu) -> Sarc<Buffer> {
 		match &self.backing {
 			UniformBufferBacking::NewSized(size) => {
 				let buffer = gpu.device.create_buffer(&BufferDescriptor {
@@ -113,7 +113,7 @@ impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for UniformBuffe
 					mapped_at_creation: false,
 				});
 
-				SmartArc::new(buffer)
+				Sarc::new(buffer)
 			}
 
 			UniformBufferBacking::FromData(data) => {
@@ -123,7 +123,7 @@ impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for UniformBuffe
 					usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
 				});
 
-				SmartArc::new(buffer)
+				Sarc::new(buffer)
 			}
 
 			UniformBufferBacking::FromBuffer(buffer) => buffer.clone(),

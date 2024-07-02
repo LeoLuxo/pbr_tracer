@@ -1,6 +1,6 @@
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, Extent3d, ShaderStages, StorageTextureAccess, TextureDimension, TextureFormat,
+	BindingResource, BindingType, ShaderStages, StorageTextureAccess, TextureDimension, TextureFormat,
 	TextureViewDimension,
 };
 
@@ -8,7 +8,7 @@ use super::{ShaderBufferDescriptor, TextureBufferDescriptor};
 use crate::{
 	core::gpu::Gpu,
 	libs::{
-		smart_arc::SmartArc,
+		smart_arc::Sarc,
 		texture::{self, TextureAsset, TextureAssetDescriptor},
 	},
 };
@@ -27,7 +27,7 @@ pub struct TextureBuffer<'a> {
 
 pub enum TextureBufferBacking<'a> {
 	New(TextureAssetDescriptor<'a>),
-	From(SmartArc<TextureAsset>),
+	From(Sarc<TextureAsset>),
 }
 
 impl<'a> TextureBuffer<'a> {
@@ -110,9 +110,9 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 		})
 	}
 
-	fn create_texture(&self, gpu: &Gpu) -> SmartArc<TextureAsset> {
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset> {
 		match &self.backing {
-			TextureBufferBacking::New(desc) => SmartArc::new(TextureAsset::create(gpu, *desc)),
+			TextureBufferBacking::New(desc) => Sarc::new(TextureAsset::create(gpu, *desc)),
 			TextureBufferBacking::From(texture) => texture.clone(),
 		}
 	}

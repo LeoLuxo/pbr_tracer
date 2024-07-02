@@ -19,7 +19,7 @@ use super::{
 		TextureBufferDescriptor,
 	},
 	embed::Assets,
-	smart_arc::SmartArc,
+	smart_arc::Sarc,
 };
 use crate::core::gpu::Gpu;
 
@@ -54,7 +54,7 @@ impl ShaderBuilder {
 			self.include(Shader::Source(other_source_code));
 		}
 
-		self.include(Shader::DataBuffer(SmartArc(
+		self.include(Shader::DataBuffer(Sarc(
 			Arc::new(data_buffer) as Arc<dyn DataBufferDescriptor>
 		)))
 	}
@@ -64,7 +64,7 @@ impl ShaderBuilder {
 			self.include(Shader::Source(other_source_code));
 		}
 
-		self.include(Shader::TextureBuffer(SmartArc(
+		self.include(Shader::TextureBuffer(Sarc(
 			Arc::new(texture_buffer) as Arc<dyn TextureBufferDescriptor>
 		)))
 	}
@@ -86,9 +86,11 @@ impl ShaderBuilder {
 		bind_group_offset: u32,
 	) -> Result<CompiledShader> {
 		let shader_source = self.build_source(gpu, shader_map, shader_stages, bind_group_offset)?;
-		println!("{}", shader_source);
 
 		let compiled_shader = shader_source.build(&gpu.device);
+
+		println!("{:#?}", compiled_shader);
+
 		Ok(compiled_shader)
 	}
 
@@ -206,8 +208,8 @@ pub enum Shader {
 	Source(String),
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
-	DataBuffer(SmartArc<dyn DataBufferDescriptor>),
-	TextureBuffer(SmartArc<dyn TextureBufferDescriptor>),
+	DataBuffer(Sarc<dyn DataBufferDescriptor>),
+	TextureBuffer(Sarc<dyn TextureBufferDescriptor>),
 }
 
 impl Shader {
@@ -269,6 +271,12 @@ impl Shader {
 
 			Shader::DataBuffer(data_buffer) => {
 				let source = data_buffer.binding_source_code(state.bind_group_offset, 0);
+
+				println!(
+					"DATA BUFFER | bind_group: {}, source: {}",
+					state.bind_group_offset, &source
+				);
+
 				let buffer = GenericDataBuffer::new(state.gpu, state.shader_stages, data_buffer.as_ref());
 				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
@@ -279,6 +287,12 @@ impl Shader {
 
 			Shader::TextureBuffer(texture_buffer) => {
 				let source = texture_buffer.binding_source_code(state.bind_group_offset, 0);
+
+				println!(
+					"TEXTURE BUFFER | bind_group: {}, source: {}",
+					state.bind_group_offset, &source
+				);
+
 				let buffer = GenericTextureBuffer::new(state.gpu, state.shader_stages, texture_buffer.as_ref());
 				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
@@ -308,8 +322,6 @@ impl Shader {
 		let mut byte_offset: isize = 0;
 		let mut includes = Vec::<(String, Range<usize>)>::new();
 
-		// println!("RECURSIVE:\n{}\n======", shader_source);
-
 		// Find all `#include "path/to/shader.wgsl"` in the source
 		let re = Regex::new(r#"(?m)^#include "(.+?)""#).unwrap();
 
@@ -326,8 +338,6 @@ impl Shader {
 		for (path_str, range) in includes {
 			// Offset the range by byte_offset
 			let range = (range.start as isize + byte_offset) as usize..(range.end as isize + byte_offset) as usize;
-
-			// println!("{:?}", range);
 
 			// Fix up the path
 			let path_relative: Utf8UnixPathBuf = path!(&path_str)
@@ -450,7 +460,7 @@ impl ShaderSource {
 		Self {
 			source,
 			buffers: BufferMapping(
-				hash_map!(bind_group_index: SmartArc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)),
+				hash_map!(bind_group_index: Sarc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)),
 			),
 		}
 	}
@@ -493,6 +503,7 @@ impl Display for ShaderSource {
 	}
 }
 
+#[derive(Debug)]
 pub struct CompiledShader {
 	pub shader_module: ShaderModule,
 	pub buffers: BufferMapping,

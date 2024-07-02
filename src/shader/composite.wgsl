@@ -2,7 +2,7 @@
 // @group(0) @binding(0) var out_texture: texture_2d<f32>;
 // @group(0) @binding(1) var out_sampler: sampler;
 
-@group(0) @binding(0) var<uniform> viewport_size: vec2u;
+// @group(0) @binding(0) var<uniform> viewport_size: vec2u;
 
 
 @vertex

@@ -11,29 +11,30 @@ use std::{
 --------------------------------------------------------------------------------
 */
 
-pub struct SmartArc<T: ?Sized>(pub Arc<T>);
+/// Smart Atomic Reference Counter
+pub struct Sarc<T: ?Sized>(pub Arc<T>);
 
-impl<T: Sized> SmartArc<T> {
+impl<T: Sized> Sarc<T> {
 	pub fn new(data: T) -> Self {
 		Self(Arc::new(data))
 	}
 }
 
-impl<T: ?Sized> Clone for SmartArc<T> {
+impl<T: ?Sized> Clone for Sarc<T> {
 	fn clone(&self) -> Self {
 		Self(self.0.clone())
 	}
 }
 
-impl<T: ?Sized> PartialEq for SmartArc<T> {
+impl<T: ?Sized> PartialEq for Sarc<T> {
 	fn eq(&self, other: &Self) -> bool {
 		Arc::ptr_eq(&self.0, &other.0)
 	}
 }
 
-impl<T: ?Sized> Eq for SmartArc<T> {}
+impl<T: ?Sized> Eq for Sarc<T> {}
 
-impl<T: ?Sized> Hash for SmartArc<T> {
+impl<T: ?Sized> Hash for Sarc<T> {
 	fn hash<H>(&self, hasher: &mut H)
 	where
 		H: Hasher,
@@ -44,13 +45,13 @@ impl<T: ?Sized> Hash for SmartArc<T> {
 	}
 }
 
-impl<T: ?Sized> Debug for SmartArc<T> {
+impl<T: ?Sized> Debug for Sarc<T> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_tuple(std::any::type_name::<Self>()).finish()
 	}
 }
 
-impl<T: ?Sized> Deref for SmartArc<T> {
+impl<T: ?Sized> Deref for Sarc<T> {
 	type Target = T;
 
 	fn deref(&self) -> &Self::Target {
@@ -58,7 +59,7 @@ impl<T: ?Sized> Deref for SmartArc<T> {
 	}
 }
 
-impl<T: ?Sized> AsRef<T> for SmartArc<T> {
+impl<T: ?Sized> AsRef<T> for Sarc<T> {
 	fn as_ref(&self) -> &T {
 		self.0.as_ref()
 	}

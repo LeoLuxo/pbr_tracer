@@ -1,13 +1,13 @@
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, Extent3d, ShaderStages, TextureDimension, TextureFormat, TextureViewDimension,
+	BindingResource, BindingType, ShaderStages, TextureDimension, TextureFormat, TextureViewDimension,
 };
 
 use super::{ShaderBufferDescriptor, TextureBufferDescriptor};
 use crate::{
 	core::gpu::Gpu,
 	libs::{
-		smart_arc::SmartArc,
+		smart_arc::Sarc,
 		texture::{self, TextureAsset, TextureAssetDescriptor, TextureAssetSamplerDescriptor},
 	},
 };
@@ -26,7 +26,7 @@ pub struct TextureSamplerBuffer<'a> {
 
 pub enum TextureBufferBacking<'a> {
 	New(TextureAssetDescriptor<'a>, TextureAssetSamplerDescriptor),
-	From(SmartArc<TextureAsset>),
+	From(Sarc<TextureAsset>),
 }
 
 impl<'a> TextureSamplerBuffer<'a> {
@@ -146,10 +146,10 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 		})
 	}
 
-	fn create_texture(&self, gpu: &Gpu) -> SmartArc<TextureAsset> {
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset> {
 		match &self.backing {
 			TextureBufferBacking::New(desc, sampler_desc) => {
-				SmartArc::new(TextureAsset::create_with_sampler(gpu, *desc, *sampler_desc))
+				Sarc::new(TextureAsset::create_with_sampler(gpu, *desc, *sampler_desc))
 			}
 			TextureBufferBacking::From(texture) => texture.clone(),
 		}

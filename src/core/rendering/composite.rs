@@ -1,20 +1,20 @@
 use bevy_ecs::{
 	event::EventReader,
-	query::With,
 	schedule::IntoSystemConfigs,
 	system::{Query, Res, ResMut},
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
+	vek::Vec2,
 	ScreenSize,
 };
 use pbr_tracer_derive::ShaderStruct;
 use velcro::vec;
 use wgpu::{
-	BindGroupLayout, BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState,
-	FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState,
-	PrimitiveTopology, RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor,
-	ShaderStages, StoreOp, VertexState,
+	BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp,
+	MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
+	RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StoreOp,
+	VertexState,
 };
 
 use super::compute::ComputeRenderer;
@@ -53,18 +53,14 @@ impl Plugin for CompositeRendererPlugin {
 		let viewport_info = ViewportInfo {
 			size: render_target.size,
 		};
+
 		let viewport_buffer = GenericDataBuffer::new(
 			gpu,
 			ShaderStages::FRAGMENT,
 			&UniformBuffer::from_data("viewport_size", viewport_info),
 		);
 
-		let composite_renderer = CompositeRenderer::new(
-			gpu,
-			render_target,
-			computer_renderer,
-			vec![&viewport_buffer.bind_group_layout],
-		);
+		let composite_renderer = CompositeRenderer::new(gpu, render_target, computer_renderer, viewport_buffer.clone());
 
 		buffer::register_uniform_auto_update::<ViewportInfo>(app);
 		app.world.spawn((viewport_info, viewport_buffer));
@@ -102,24 +98,26 @@ impl CompositeRenderer {
 		gpu: &Gpu,
 		render_target: &RenderTarget,
 		compute_renderer: &ComputeRenderer,
-		additional_layouts: Vec<&BindGroupLayout>,
+		viewport_buffer: GenericDataBuffer,
 	) -> Self {
 		let shader = ShaderBuilder::new()
+			.include_path("composite.wgsl")
 			.include_texture(TextureSamplerBuffer::new(
 				"out_texture",
 				"out_sampler",
 				buffer::texture_sampler_buffer::TextureBufferBacking::From(compute_renderer.output_texture.clone()),
 			))
-			.include_path("composite.wgsl")
-			.build(gpu, &ShaderAssets, ShaderStages::FRAGMENT, 1)
+			.include_data_buffer(UniformBuffer::<Vec2<u32>>::from_buffer(
+				"viewport_size",
+				viewport_buffer.buffer,
+			))
+			.build(gpu, &ShaderAssets, ShaderStages::FRAGMENT, 0)
 			.expect("Couldn't build shader");
-
-		let bind_group_layouts = &vec![..additional_layouts, ..shader.buffers.layouts()];
 
 		// Contains the bind group layouts that are needed in the pipeline
 		let render_pipeline_layout = gpu.device.create_pipeline_layout(&PipelineLayoutDescriptor {
 			label: Some("Render Pipeline Layout"),
-			bind_group_layouts,
+			bind_group_layouts: &shader.buffers.layouts(),
 			push_constant_ranges: &[],
 		});
 
@@ -185,12 +183,7 @@ fn resize(window_events: EventReader<WindowResizedEvent>, mut q: Query<&mut View
 	}
 }
 
-fn render(
-	composite_renderer: Res<CompositeRenderer>,
-	mut render_target: ResMut<RenderTarget<'static>>,
-	gpu: Res<Gpu>,
-	q: Query<&GenericDataBuffer, With<ViewportInfo>>,
-) {
+fn render(composite_renderer: Res<CompositeRenderer>, mut render_target: ResMut<RenderTarget<'static>>, gpu: Res<Gpu>) {
 	// trace!("Rendering terrain");
 
 	// A command encoder takes multiple draw/compute commands that can then be
@@ -228,7 +221,6 @@ fn render(
 
 		render_pass.set_pipeline(&composite_renderer.pipeline);
 
-		render_pass.set_bind_group(0, &q.single().bind_group, &[]);
 		composite_renderer.shader.buffers.apply_to_render_pass(&mut render_pass);
 
 		// Draw 2 fullscreen triangles

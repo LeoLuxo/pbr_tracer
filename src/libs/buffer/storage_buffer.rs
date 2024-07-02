@@ -7,7 +7,7 @@ use wgpu::{
 use super::{DataBufferDescriptor, DataBufferUploadable, ShaderBufferDescriptor};
 use crate::{
 	core::gpu::Gpu,
-	libs::{buffer::ShaderType, smart_arc::SmartArc},
+	libs::{buffer::ShaderType, smart_arc::Sarc},
 };
 
 /*
@@ -25,7 +25,7 @@ pub struct StorageBuffer<T: DataBufferUploadable + ShaderType> {
 pub enum StorageBufferBacking<T: DataBufferUploadable + ShaderType> {
 	NewSized(u64),
 	FromData(T),
-	FromBuffer(SmartArc<Buffer>),
+	FromBuffer(Sarc<Buffer>),
 }
 
 impl<T: DataBufferUploadable + ShaderType> StorageBuffer<T> {
@@ -45,7 +45,7 @@ impl<T: DataBufferUploadable + ShaderType> StorageBuffer<T> {
 		}
 	}
 
-	pub fn from_buffer(var_name: impl Into<String>, buffer: SmartArc<Buffer>, read_only: bool) -> Self {
+	pub fn from_buffer(var_name: impl Into<String>, buffer: Sarc<Buffer>, read_only: bool) -> Self {
 		Self {
 			var_name: var_name.into(),
 			read_only,
@@ -110,7 +110,7 @@ impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for StorageBuffe
 		})
 	}
 
-	fn create_buffer(&self, gpu: &Gpu) -> SmartArc<Buffer> {
+	fn create_buffer(&self, gpu: &Gpu) -> Sarc<Buffer> {
 		match &self.backing {
 			StorageBufferBacking::NewSized(size) => {
 				let buffer = gpu.device.create_buffer(&BufferDescriptor {
@@ -120,7 +120,7 @@ impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for StorageBuffe
 					mapped_at_creation: false,
 				});
 
-				SmartArc::new(buffer)
+				Sarc::new(buffer)
 			}
 
 			StorageBufferBacking::FromData(data) => {
@@ -130,7 +130,7 @@ impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for StorageBuffe
 					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
 				});
 
-				SmartArc::new(buffer)
+				Sarc::new(buffer)
 			}
 
 			StorageBufferBacking::FromBuffer(buffer) => buffer.clone(),

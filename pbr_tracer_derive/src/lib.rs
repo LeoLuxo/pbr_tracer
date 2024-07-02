@@ -44,7 +44,5 @@ pub fn shader_struct_derive(input: TokenStream) -> TokenStream {
 		_ => panic!("Must be a struct"),
 	};
 
-	// println!("\n{}", out);
-
 	out.into()
 }

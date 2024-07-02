@@ -7,9 +7,8 @@ use brainrot::{
 	ScreenSize,
 };
 use wgpu::{
-	BindGroupDescriptor, BindGroupEntry, CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline,
-	ComputePipelineDescriptor, FilterMode, SamplerBorderColor, ShaderStages, StorageTextureAccess, TextureAspect,
-	TextureFormat, TextureUsages,
+	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
+	SamplerBorderColor, ShaderStages, StorageTextureAccess, TextureAspect, TextureFormat, TextureUsages,
 };
 
 use crate::{
@@ -18,7 +17,7 @@ use crate::{
 		buffer::texture_buffer::{TextureBuffer, TextureBufferBacking},
 		shader::{CompiledShader, ShaderBuilder},
 		shader_fragment::{Renderer, ShaderFragment},
-		smart_arc::SmartArc,
+		smart_arc::Sarc,
 		texture::{Edges, TextureAsset, TextureAssetDescriptor, TextureAssetDimensions, TextureAssetSamplerDescriptor},
 	},
 	ShaderAssets,
@@ -62,14 +61,14 @@ pub struct ComputeRenderPass;
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
-	pub output_texture: SmartArc<TextureAsset>,
+	pub output_texture: Sarc<TextureAsset>,
 	shader: CompiledShader,
 }
 
 impl ComputeRenderer {
 	pub fn new(gpu: &Gpu, resolution: ScreenSize, renderer: &dyn ShaderFragment) -> Self {
 		// The output texture that the compute will write to
-		let output_texture = SmartArc::new(TextureAsset::create_with_sampler(
+		let output_texture = Sarc::new(TextureAsset::create_with_sampler(
 			gpu,
 			TextureAssetDescriptor {
 				label: "Compute Renderer output",
