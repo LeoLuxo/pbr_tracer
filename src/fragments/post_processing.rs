@@ -41,10 +41,10 @@ impl ShaderFragment for PostProcessingPipeline {
 		// to a unique name and add a call to that function to the pipeline
 		for effect in &self.0 {
 			let mut shader = (*effect).shader();
-			
+
 			let func_name = shader.obfuscate_fn("post_processing_effect");
 			pipeline += &format!("color = {}(coord, color);\n", func_name);
-			
+
 			builder.include(shader);
 		}
 

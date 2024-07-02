@@ -199,19 +199,7 @@ impl ShaderBuffer for GenericTextureBuffer {
 #[derive(Default)]
 pub struct BufferMapping(pub HashMap<u32, Sarc<dyn ShaderBuffer + Sync + Send>>);
 
-impl<'a> BufferMapping {
-	pub fn apply_to_render_pass(&'a self, render_pass: &mut RenderPass<'a>) {
-		for (index, shader_buffer) in &self.0 {
-			render_pass.set_bind_group(*index, shader_buffer.bind_group(), &[]);
-		}
-	}
-
-	pub fn apply_to_compute_pass(&'a self, compute_pass: &mut ComputePass<'a>) {
-		for (index, shader_buffer) in &self.0 {
-			compute_pass.set_bind_group(*index, shader_buffer.bind_group(), &[]);
-		}
-	}
-
+impl BufferMapping {
 	pub fn layouts(&self) -> Vec<&BindGroupLayout> {
 		let mut entries = self.0.iter().collect::<Vec<_>>();
 		entries.sort_by_key(|(i, _)| *i);
@@ -228,6 +216,26 @@ impl std::fmt::Debug for BufferMapping {
 		}
 
 		tuple.finish()
+	}
+}
+
+pub trait BufferMappingApplicable<'a> {
+	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a BufferMapping);
+}
+
+impl<'a> BufferMappingApplicable<'a> for ComputePass<'a> {
+	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a BufferMapping) {
+		for (index, shader_buffer) in &buffer_mapping.0 {
+			self.set_bind_group(*index, shader_buffer.bind_group(), &[]);
+		}
+	}
+}
+
+impl<'a> BufferMappingApplicable<'a> for RenderPass<'a> {
+	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a BufferMapping) {
+		for (index, shader_buffer) in &buffer_mapping.0 {
+			self.set_bind_group(*index, shader_buffer.bind_group(), &[]);
+		}
 	}
 }
 

@@ -28,8 +28,8 @@ use crate::{
 	},
 	libs::{
 		buffer::{
-			self, texture_sampler_buffer::TextureSamplerBuffer, uniform_buffer::UniformBuffer, GenericDataBuffer,
-			ShaderType,
+			self, texture_sampler_buffer::TextureSamplerBuffer, uniform_buffer::UniformBuffer, BufferMappingApplicable,
+			GenericDataBuffer, ShaderType,
 		},
 		shader::{CompiledShader, ShaderBuilder},
 	},
@@ -221,7 +221,7 @@ fn render(composite_renderer: Res<CompositeRenderer>, mut render_target: ResMut<
 
 		render_pass.set_pipeline(&composite_renderer.pipeline);
 
-		composite_renderer.shader.buffers.apply_to_render_pass(&mut render_pass);
+		render_pass.apply_buffer_mapping(&composite_renderer.shader.buffers);
 
 		// Draw 2 fullscreen triangles
 		// 2 - 3

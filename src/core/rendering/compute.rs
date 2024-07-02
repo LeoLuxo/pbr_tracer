@@ -14,7 +14,10 @@ use wgpu::{
 use crate::{
 	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	libs::{
-		buffer::texture_buffer::{TextureBuffer, TextureBufferBacking},
+		buffer::{
+			texture_buffer::{TextureBuffer, TextureBufferBacking},
+			BufferMappingApplicable,
+		},
 		shader::{CompiledShader, ShaderBuilder},
 		shader_fragment::{Renderer, ShaderFragment},
 		smart_arc::Sarc,
@@ -139,7 +142,7 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 
 		compute_pass.set_pipeline(&compute_renderer.pipeline);
 
-		compute_renderer.shader.buffers.apply_to_compute_pass(&mut compute_pass);
+		compute_pass.apply_buffer_mapping(&compute_renderer.shader.buffers);
 
 		compute_pass.dispatch_workgroups(out_width, out_height, 1);
 	}
