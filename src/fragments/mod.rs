@@ -1,4 +1,4 @@
 pub mod debug;
-pub mod intersector;
+pub mod intersectors;
 pub mod pathtracer;
 pub mod post_processing;

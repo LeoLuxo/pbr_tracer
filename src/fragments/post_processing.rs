@@ -1,5 +1,3 @@
-use brainrot::path;
-
 use crate::libs::{
 	shader::{Shader, ShaderBuilder},
 	shader_fragment::ShaderFragment,
@@ -43,8 +41,10 @@ impl ShaderFragment for PostProcessingPipeline {
 		// to a unique name and add a call to that function to the pipeline
 		for effect in &self.0 {
 			let mut shader = (*effect).shader();
+			
 			let func_name = shader.obfuscate_fn("post_processing_effect");
 			pipeline += &format!("color = {}(coord, color);\n", func_name);
+			
 			builder.include(shader);
 		}
 
@@ -66,6 +66,9 @@ pub struct GammaCorrection;
 impl PostProcessingEffect for GammaCorrection {}
 impl ShaderFragment for GammaCorrection {
 	fn shader(&self) -> Shader {
-		path!("/post_processing/gamma.wgsl").into()
+		ShaderBuilder::new()
+			.include_path("/post_processing/gamma.wgsl")
+			.include_value("gamma", 2.2)
+			.into()
 	}
 }

@@ -15,8 +15,8 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
 
 use super::{
 	buffer::{
-		BufferMapping, DataBufferDescriptor, GenericDataBuffer, GenericTextureBuffer, ShaderBuffer,
-		TextureBufferDescriptor,
+		uniform_buffer::UniformBuffer, BufferMapping, DataBufferDescriptor, DataBufferUploadable, GenericDataBuffer,
+		GenericTextureBuffer, ShaderBuffer, ShaderType, TextureBufferDescriptor,
 	},
 	embed::Assets,
 	smart_arc::Sarc,
@@ -67,6 +67,13 @@ impl ShaderBuilder {
 		self.include(Shader::TextureBuffer(Sarc(
 			Arc::new(texture_buffer) as Arc<dyn TextureBufferDescriptor>
 		)))
+	}
+
+	pub fn include_value<T>(&mut self, var_name: impl Into<String>, value: T) -> &mut Self
+	where
+		T: DataBufferUploadable + ShaderType + 'static,
+	{
+		self.include_data_buffer(UniformBuffer::from_data(var_name, value))
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self

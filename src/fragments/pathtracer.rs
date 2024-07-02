@@ -1,4 +1,4 @@
-use super::{intersector::Intersector, post_processing::PostProcessingPipeline};
+use super::{intersectors::Intersector, post_processing::PostProcessingPipeline};
 use crate::libs::{
 	shader::{Shader, ShaderBuilder},
 	shader_fragment::{Renderer, ShaderFragment},

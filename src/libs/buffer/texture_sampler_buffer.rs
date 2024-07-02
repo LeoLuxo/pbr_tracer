@@ -88,7 +88,7 @@ impl ShaderBufferDescriptor for TextureSamplerBuffer<'_> {
 			self.sampler_var_name
 		);
 
-		line1 + &line2
+		line1 + "\n" + &line2
 	}
 
 	fn other_source_code(&self) -> Option<String> {

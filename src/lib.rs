@@ -20,7 +20,7 @@ use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, size};
 use fragments::{
-	intersector::Raymarcher,
+	intersectors::Raymarcher,
 	pathtracer::PhysBasedRaytracer,
 	post_processing::{GammaCorrection, PostProcessingPipeline},
 };
