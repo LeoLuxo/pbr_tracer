@@ -20,8 +20,7 @@ use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, size};
 use fragments::{
-	mpr::{MultiPurposeRenderer, Raymarcher, SimpleDiffuse},
-	post_processing::PostProcessingPipeline,
+	intersector::Raymarcher, mpr::MultiPurposeRenderer, post_processing::PostProcessingPipeline, shading::SimpleDiffuse,
 };
 use rust_embed::Embed;
 use wgpu::FilterMode;
