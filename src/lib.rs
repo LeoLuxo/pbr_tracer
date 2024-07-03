@@ -20,8 +20,7 @@ use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, size};
 use fragments::{
-	intersectors::Raymarcher,
-	pathtracer::PhysBasedRaytracer,
+	mpr::{MultiPurposeRenderer, Raymarcher, SimpleDiffuse},
 	post_processing::{GammaCorrection, PostProcessingPipeline},
 };
 use rust_embed::Embed;
@@ -51,15 +50,18 @@ type EventLoop = winit::event_loop::EventLoop<()>;
 pub fn run() {
 	AsyncComputeTaskPool::get_or_init(TaskPool::new);
 
+	let renderer = MultiPurposeRenderer {
+		intersector: Raymarcher,
+		shading: SimpleDiffuse,
+		post_processing: PostProcessingPipeline::empty().with(GammaCorrection),
+	};
+
 	App::new()
 		// Standalone raytracer plugins
 		.add_plugin(GpuPlugin)
 		.add_plugin(ComputeRendererPlugin {
 			resolution: size!(1000, 500),
-			renderer: PhysBasedRaytracer {
-				intersector: Raymarcher,
-				ppp: PostProcessingPipeline::empty().with(GammaCorrection),
-			},
+			renderer,
 			// renderer: DebugRenderer,
 		})
 		// Core plugins

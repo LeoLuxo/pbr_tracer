@@ -1,4 +1,3 @@
 pub mod debug;
-pub mod intersectors;
-pub mod pathtracer;
+pub mod mpr;
 pub mod post_processing;

@@ -1,4 +1,15 @@
 
+struct Intersection {
+	has_hit: bool,
+	object: Object,
+	position: vec3f,
+	normal: vec3f,
+	outgoing: vec3f,
+}
+
+struct Object {
+	color: vec3f,
+}
 
 fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f {
 	let coord = (pixel_coord - pixel_size / 2.0) / pixel_size.y;
@@ -6,10 +17,6 @@ fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f {
 }
 
 fn render(coord: vec2f) -> vec4f {
-	if (coord.x < 0.01 && coord.x > -0.01 && coord.y < 0.01 && coord.y > -0.01) {
-		return vec4f(1, 0, 0, 1);
-	}
-
 	let ray_origin = vec3f(0, 0, -5);
 	let ray_target = vec3f(0);
 	
@@ -19,9 +26,11 @@ fn render(coord: vec2f) -> vec4f {
 	
 	let ray_dir = view_mat * normalize(vec3f(coord, focal_length));
 	
-	var color = send_ray(ray_origin, ray_dir);
+	let intersection = intersect_scene(ray_origin, ray_dir);
 	
-	CALL_POST_PROCESSING_PIPELINE
+	var color = shade(intersection);
+	
+	color = post_processing_pipeline(coord, color);
 
 	return color;
 }
