@@ -20,7 +20,7 @@ pub trait Intersector: ShaderFragment {}
 
 /// Shader API:\
 /// `fn shade(intersection: Intersection) -> vec4f`
-pub trait Shading: ShaderFragment {}
+pub trait Shading<I: Intersector>: ShaderFragment {}
 
 /*
 --------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ pub trait Shading: ShaderFragment {}
 pub struct MultiPurposeRenderer<I, S>
 where
 	I: Intersector,
-	S: Shading,
+	S: Shading<I>,
 {
 	pub intersector: I,
 	pub shading: S,
@@ -41,14 +41,14 @@ where
 impl<I, S> Renderer for MultiPurposeRenderer<I, S>
 where
 	I: Intersector,
-	S: Shading,
+	S: Shading<I>,
 {
 }
 
 impl<I, S> ShaderFragment for MultiPurposeRenderer<I, S>
 where
 	I: Intersector,
-	S: Shading,
+	S: Shading<I>,
 {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
@@ -106,12 +106,12 @@ impl ShaderFragment for Raymarcher {
 
 pub struct SimpleDiffuse;
 
-impl Shading for SimpleDiffuse {}
+impl<I: Intersector> Shading<I> for SimpleDiffuse {}
 impl ShaderFragment for SimpleDiffuse {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()
 			.include_path("/shading/simple_diffuse.wgsl")
-			.include_value("sun_direction", vec3!(1.0, -1.0, -1.0).normalized())
+			.include_value("sun_direction", vec3!(1.0, -1.0, 1.0).normalized())
 			.into()
 	}
 }

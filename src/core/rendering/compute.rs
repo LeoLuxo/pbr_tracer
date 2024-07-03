@@ -34,6 +34,7 @@ use crate::{
 
 pub struct ComputeRendererPlugin<R: Renderer> {
 	pub resolution: ScreenSize,
+	pub filter_mode: FilterMode,
 	pub renderer: R,
 }
 
@@ -44,7 +45,7 @@ where
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
-		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, &self.renderer);
+		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, self.filter_mode, &self.renderer);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -69,7 +70,7 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new(gpu: &Gpu, resolution: ScreenSize, renderer: &dyn ShaderFragment) -> Self {
+	pub fn new(gpu: &Gpu, resolution: ScreenSize, filter_mode: FilterMode, renderer: &dyn ShaderFragment) -> Self {
 		// The output texture that the compute will write to
 		let output_texture = Sarc::new(TextureAsset::create_with_sampler(
 			gpu,
@@ -82,7 +83,7 @@ impl ComputeRenderer {
 			},
 			TextureAssetSamplerDescriptor {
 				edges: Edges::ClampToColor(SamplerBorderColor::TransparentBlack),
-				filter: FilterMode::Nearest,
+				filter: filter_mode,
 				compare: None,
 			},
 		));

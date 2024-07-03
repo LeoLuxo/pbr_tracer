@@ -80,7 +80,9 @@ impl<'a> RenderTarget<'a> {
 		let capabilities = surface.get_capabilities(&gpu.adapter);
 
 		// According to the docs, the first format is normally the preferred one
-		let surface_format = capabilities.formats[0];
+		// Force it to be srgb so that gamma correction is done by the GPU
+		let surface_format = capabilities.formats[0].add_srgb_suffix();
+		println!("{:?}", capabilities.formats);
 
 		let present_mode = if capabilities.present_modes.contains(&PresentMode::Mailbox) {
 			// For some reason FIFO is jittery on my desktop PC, so prioritize Mailbox

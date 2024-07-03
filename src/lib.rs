@@ -21,9 +21,10 @@ use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, size};
 use fragments::{
 	mpr::{MultiPurposeRenderer, Raymarcher, SimpleDiffuse},
-	post_processing::{GammaCorrection, PostProcessingPipeline},
+	post_processing::PostProcessingPipeline,
 };
 use rust_embed::Embed;
+use wgpu::FilterMode;
 
 /*
 --------------------------------------------------------------------------------
@@ -53,14 +54,15 @@ pub fn run() {
 	let renderer = MultiPurposeRenderer {
 		intersector: Raymarcher,
 		shading: SimpleDiffuse,
-		post_processing: PostProcessingPipeline::empty().with(GammaCorrection),
+		post_processing: PostProcessingPipeline::empty(),
 	};
 
 	App::new()
 		// Standalone raytracer plugins
 		.add_plugin(GpuPlugin)
 		.add_plugin(ComputeRendererPlugin {
-			resolution: size!(1000, 500),
+			resolution: size!(2000, 1000),
+			filter_mode: FilterMode::Linear,
 			renderer,
 			// renderer: DebugRenderer,
 		})

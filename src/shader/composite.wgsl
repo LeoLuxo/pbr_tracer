@@ -25,6 +25,9 @@ fn fs_main(@builtin(position) frag_coord: vec4f) -> @location(0) vec4f {
 		let size_x = screen_size.x / screen_size.y / texture_size.x * texture_size.y;
 		tex_coord.x = frag_coord.x / screen_size.x * size_x + (1.0 - size_x) * 0.5;
 	}
+	
+	// Invert the y coordinate since texture-y is from top to bottom.
+	tex_coord.y = 1.0 - tex_coord.y;
 
 	return textureSample(out_texture, out_sampler, tex_coord);
 }
