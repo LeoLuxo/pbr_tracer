@@ -19,9 +19,8 @@ use core::{
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
 use brainrot::{bevy::App, size};
-use fragments::{
-	intersector::Raymarcher, mpr::MultiPurposeRenderer, post_processing::PostProcessingPipeline, shading::SimpleDiffuse,
-};
+use fragments::{intersector::*, mpr::MultiPurposeRenderer, post_processing::PostProcessingPipeline, shading::*};
+use image::DynamicImage;
 use rust_embed::Embed;
 use wgpu::FilterMode;
 
@@ -35,6 +34,17 @@ use wgpu::FilterMode;
 #[folder = "src/shader/"]
 #[prefix = "/"]
 struct ShaderAssets;
+
+#[derive(Embed)]
+#[folder = "assets/"]
+struct TextureAssets;
+
+impl TextureAssets {
+	pub fn get_image(path: &str) -> DynamicImage {
+		image::load_from_memory(&Self::get(path).expect("Invalid image path").data)
+			.expect("Couldn't load image bytes from memory")
+	}
+}
 
 pub trait EntityLabel {}
 
@@ -52,7 +62,7 @@ pub fn run() {
 
 	let renderer = MultiPurposeRenderer {
 		intersector: Raymarcher,
-		shading: SimpleDiffuse,
+		shading: CelShading,
 		post_processing: PostProcessingPipeline::empty(),
 	};
 

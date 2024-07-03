@@ -18,7 +18,7 @@ pub trait Intersector: ShaderFragment {}
 
 /// Shader API:\
 /// `fn shade(intersection: Intersection) -> vec4f`
-pub trait Shading<I: Intersector>: ShaderFragment {}
+pub trait Shading: ShaderFragment {}
 
 /*
 --------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ pub trait Shading<I: Intersector>: ShaderFragment {}
 pub struct MultiPurposeRenderer<I, S>
 where
 	I: Intersector,
-	S: Shading<I>,
+	S: Shading,
 {
 	pub intersector: I,
 	pub shading: S,
@@ -39,14 +39,14 @@ where
 impl<I, S> Renderer for MultiPurposeRenderer<I, S>
 where
 	I: Intersector,
-	S: Shading<I>,
+	S: Shading,
 {
 }
 
 impl<I, S> ShaderFragment for MultiPurposeRenderer<I, S>
 where
 	I: Intersector,
-	S: Shading<I>,
+	S: Shading,
 {
 	fn shader(&self) -> Shader {
 		ShaderBuilder::new()

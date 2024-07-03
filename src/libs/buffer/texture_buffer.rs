@@ -1,7 +1,8 @@
+use image::DynamicImage;
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, ShaderStages, StorageTextureAccess, TextureDimension, TextureFormat,
-	TextureViewDimension,
+	BindingResource, BindingType, ShaderStages, StorageTextureAccess, TextureAspect, TextureDimension, TextureFormat,
+	TextureUsages, TextureViewDimension,
 };
 
 use super::{ShaderBufferDescriptor, TextureBufferDescriptor};
@@ -9,7 +10,7 @@ use crate::{
 	core::gpu::Gpu,
 	libs::{
 		smart_arc::Sarc,
-		texture::{self, TextureAsset, TextureAssetDescriptor},
+		texture::{self, TextureAsset, TextureAssetDescriptor, TextureAssetDimensions},
 	},
 };
 
@@ -26,8 +27,20 @@ pub struct TextureBuffer<'a> {
 }
 
 pub enum TextureBufferBacking<'a> {
-	New(TextureAssetDescriptor<'a>),
-	From(Sarc<TextureAsset>),
+	WithBacking(Sarc<TextureAsset>),
+	New {
+		label: &'a str,
+		dimensions: TextureAssetDimensions,
+		format: TextureFormat,
+		usage: Option<TextureUsages>,
+		aspect: TextureAspect,
+	},
+	FromImage {
+		label: &'a str,
+		image: DynamicImage,
+		format: TextureFormat,
+		usage: Option<TextureUsages>,
+	},
 }
 
 impl<'a> TextureBuffer<'a> {
@@ -41,22 +54,25 @@ impl<'a> TextureBuffer<'a> {
 
 	fn get_dimension(&self) -> TextureDimension {
 		match &self.backing {
-			TextureBufferBacking::New(desc) => desc.dimensions.get_dimension().compatible_texture_dimension(),
-			TextureBufferBacking::From(texture) => texture.dimension(),
+			TextureBufferBacking::WithBacking(texture) => texture.dimension(),
+			TextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension().compatible_texture_dimension(),
+			TextureBufferBacking::FromImage { .. } => TextureDimension::D2,
 		}
 	}
 
 	fn get_view_dimension(&self) -> TextureViewDimension {
 		match &self.backing {
-			TextureBufferBacking::New(desc) => desc.dimensions.get_dimension(),
-			TextureBufferBacking::From(texture) => texture.view_dimension(),
+			TextureBufferBacking::WithBacking(texture) => texture.view_dimension(),
+			TextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
+			TextureBufferBacking::FromImage { .. } => TextureViewDimension::D2,
 		}
 	}
 
 	fn get_format(&self) -> TextureFormat {
 		match &self.backing {
-			TextureBufferBacking::New(desc) => desc.format,
-			TextureBufferBacking::From(texture) => texture.format(),
+			TextureBufferBacking::WithBacking(texture) => texture.format(),
+			TextureBufferBacking::New { format, .. } => *format,
+			TextureBufferBacking::FromImage { format, .. } => *format,
 		}
 	}
 }
@@ -112,8 +128,31 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 
 	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset> {
 		match &self.backing {
-			TextureBufferBacking::New(desc) => Sarc::new(TextureAsset::create(gpu, *desc)),
-			TextureBufferBacking::From(texture) => texture.clone(),
+			TextureBufferBacking::WithBacking(texture) => texture.clone(),
+
+			TextureBufferBacking::New {
+				label,
+				dimensions,
+				format,
+				usage,
+				aspect,
+			} => Sarc::new(TextureAsset::create(
+				gpu,
+				TextureAssetDescriptor {
+					label,
+					dimensions: *dimensions,
+					format: *format,
+					usage: *usage,
+					aspect: *aspect,
+				},
+			)),
+
+			TextureBufferBacking::FromImage {
+				label,
+				image,
+				format,
+				usage,
+			} => Sarc::new(TextureAsset::from_image_storage(gpu, label, image, *format, *usage)),
 		}
 	}
 }

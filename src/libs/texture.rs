@@ -79,8 +79,15 @@ pub struct TextureAssetDescriptor<'a> {
 	pub label: &'a str,
 	pub dimensions: TextureAssetDimensions,
 	pub format: TextureFormat,
-	pub usage: TextureUsages,
+	pub usage: Option<TextureUsages>,
 	pub aspect: TextureAspect,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TextureAssetSamplerDescriptor {
+	pub filter: FilterMode,
+	pub edges: Edges,
+	pub compare: Option<CompareFunction>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -109,13 +116,6 @@ impl Edges {
 	}
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TextureAssetSamplerDescriptor {
-	pub edges: Edges,
-	pub filter: FilterMode,
-	pub compare: Option<CompareFunction>,
-}
-
 #[derive(Debug)]
 pub struct TextureAsset {
 	view_dimension: TextureViewDimension,
@@ -128,32 +128,34 @@ pub struct TextureAsset {
 impl TextureAsset {
 	pub const DEFAULT_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
-	pub fn from_image_bytes(
+	pub fn from_image_bytes_with_sampler(
 		gpu: &Gpu,
 		bytes: &[u8],
+		format: TextureFormat,
 		filter: FilterMode,
 		edges: Edges,
-		usage: TextureUsages,
+		usage: Option<TextureUsages>,
 		label: &str,
 	) -> Self {
 		let img = image::load_from_memory(bytes).expect("Couldn't load image bytes from memory");
-		Self::from_image(gpu, &img, filter, edges, usage, label)
+		Self::from_image_with_sampler(gpu, label, &img, format, usage, filter, edges)
 	}
 
-	pub fn from_image(
+	pub fn from_image_with_sampler(
 		gpu: &Gpu,
+		label: &str,
 		img: &image::DynamicImage,
+		format: TextureFormat,
+		usage: Option<TextureUsages>,
 		filter: FilterMode,
 		edges: Edges,
-		usage: TextureUsages,
-		label: &str,
 	) -> Self {
-		Self::create_with_sampler(
+		let texture = Self::create_with_sampler(
 			gpu,
 			TextureAssetDescriptor {
 				label,
 				dimensions: TextureAssetDimensions::D2(img.dimensions().into()),
-				format: TextureFormat::Rgba8Unorm,
+				format,
 				usage,
 				aspect: TextureAspect::All,
 			},
@@ -162,7 +164,32 @@ impl TextureAsset {
 				filter,
 				compare: None,
 			},
-		)
+		);
+
+		texture.upload_image(gpu, img);
+		texture
+	}
+
+	pub fn from_image_storage(
+		gpu: &Gpu,
+		label: &str,
+		img: &image::DynamicImage,
+		format: TextureFormat,
+		usage: Option<TextureUsages>,
+	) -> Self {
+		let texture = Self::create(
+			gpu,
+			TextureAssetDescriptor {
+				label,
+				dimensions: TextureAssetDimensions::D2(img.dimensions().into()),
+				format,
+				usage,
+				aspect: TextureAspect::All,
+			},
+		);
+
+		texture.upload_image(gpu, img);
+		texture
 	}
 
 	pub fn create_depth_texture(gpu: &Gpu, size: Extent2<u32>, label: &str) -> Self {
@@ -172,7 +199,7 @@ impl TextureAsset {
 				label,
 				dimensions: TextureAssetDimensions::D2(size),
 				format: Self::DEFAULT_DEPTH_FORMAT,
-				usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+				usage: Some(TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING),
 				aspect: TextureAspect::DepthOnly,
 			},
 			TextureAssetSamplerDescriptor {
@@ -194,7 +221,10 @@ impl TextureAsset {
 			sample_count: 1,
 			dimension: view_dimension.compatible_texture_dimension(),
 			format: desc.format,
-			usage: desc.usage | TextureUsages::COPY_DST,
+			usage: desc.usage.unwrap_or(TextureUsages::empty())
+				| TextureUsages::COPY_DST
+				| TextureUsages::STORAGE_BINDING,
+			// TODO: Clean up usages
 			view_formats: &[],
 		});
 
@@ -222,7 +252,7 @@ impl TextureAsset {
 	) -> Self {
 		// If the texture is gonna be sampled, it needs to be bound with TEXTURE_BINDING
 		// anyway
-		desc.usage |= TextureUsages::TEXTURE_BINDING;
+		desc.usage = desc.usage.map(|u| u | TextureUsages::TEXTURE_BINDING);
 
 		let sampler = Some(gpu.device.create_sampler(&SamplerDescriptor {
 			label: Some(&format!("{} Sampler", desc.label)),
@@ -241,6 +271,15 @@ impl TextureAsset {
 			sampler,
 			..Self::create(gpu, desc)
 		}
+	}
+
+	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8]) {
+		self.upload_bytes_layer(gpu, bytes, 0)
+	}
+
+	pub fn upload_bytes_layer(&self, gpu: &Gpu, bytes: &[u8], layer: u32) {
+		let img = image::load_from_memory(bytes).expect("Couldn't load image bytes from memory");
+		self.upload_image_layer(gpu, &img, layer)
 	}
 
 	pub fn upload_image(&self, gpu: &Gpu, img: &image::DynamicImage) {

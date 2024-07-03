@@ -78,7 +78,7 @@ impl ComputeRenderer {
 				label: "Compute Renderer output",
 				dimensions: TextureAssetDimensions::D2(resolution),
 				format: TextureFormat::Rgba32Float,
-				usage: TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC,
+				usage: Some(TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC),
 				aspect: TextureAspect::All,
 			},
 			TextureAssetSamplerDescriptor {
@@ -93,7 +93,7 @@ impl ComputeRenderer {
 			.include_texture(TextureBuffer::new(
 				"out_texture",
 				StorageTextureAccess::ReadWrite,
-				TextureBufferBacking::From(output_texture.clone()),
+				TextureBufferBacking::WithBacking(output_texture.clone()),
 			))
 			.include_path("compute.wgsl")
 			.include(renderer.shader())

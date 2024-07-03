@@ -1,6 +1,8 @@
+use image::DynamicImage;
 use wgpu::{
 	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, ShaderStages, TextureDimension, TextureFormat, TextureViewDimension,
+	BindingResource, BindingType, CompareFunction, FilterMode, ShaderStages, TextureAspect, TextureDimension,
+	TextureFormat, TextureUsages, TextureViewDimension,
 };
 
 use super::{ShaderBufferDescriptor, TextureBufferDescriptor};
@@ -8,7 +10,9 @@ use crate::{
 	core::gpu::Gpu,
 	libs::{
 		smart_arc::Sarc,
-		texture::{self, TextureAsset, TextureAssetDescriptor, TextureAssetSamplerDescriptor},
+		texture::{
+			self, Edges, TextureAsset, TextureAssetDescriptor, TextureAssetDimensions, TextureAssetSamplerDescriptor,
+		},
 	},
 };
 
@@ -21,19 +25,36 @@ use crate::{
 pub struct TextureSamplerBuffer<'a> {
 	pub texture_var_name: String,
 	pub sampler_var_name: String,
-	pub backing: TextureBufferBacking<'a>,
+	pub backing: TextureSamplerBufferBacking<'a>,
 }
 
-pub enum TextureBufferBacking<'a> {
-	New(TextureAssetDescriptor<'a>, TextureAssetSamplerDescriptor),
-	From(Sarc<TextureAsset>),
+pub enum TextureSamplerBufferBacking<'a> {
+	WithBacking(Sarc<TextureAsset>),
+	New {
+		label: &'a str,
+		dimensions: TextureAssetDimensions,
+		format: TextureFormat,
+		usage: Option<TextureUsages>,
+		aspect: TextureAspect,
+		filter: FilterMode,
+		edges: Edges,
+		compare: Option<CompareFunction>,
+	},
+	FromImage {
+		label: &'a str,
+		image: DynamicImage,
+		format: TextureFormat,
+		usage: Option<TextureUsages>,
+		filter: FilterMode,
+		edges: Edges,
+	},
 }
 
 impl<'a> TextureSamplerBuffer<'a> {
 	pub fn new(
 		texture_var_name: impl Into<String>,
 		sampler_var_name: impl Into<String>,
-		backing: TextureBufferBacking<'a>,
+		backing: TextureSamplerBufferBacking<'a>,
 	) -> Self {
 		Self {
 			texture_var_name: texture_var_name.into(),
@@ -44,22 +65,27 @@ impl<'a> TextureSamplerBuffer<'a> {
 
 	fn get_dimension(&self) -> TextureDimension {
 		match &self.backing {
-			TextureBufferBacking::New(desc, _) => desc.dimensions.get_dimension().compatible_texture_dimension(),
-			TextureBufferBacking::From(texture) => texture.dimension(),
+			TextureSamplerBufferBacking::WithBacking(texture) => texture.dimension(),
+			TextureSamplerBufferBacking::New { dimensions, .. } => {
+				dimensions.get_dimension().compatible_texture_dimension()
+			}
+			TextureSamplerBufferBacking::FromImage { .. } => TextureDimension::D2,
 		}
 	}
 
 	fn get_view_dimension(&self) -> TextureViewDimension {
 		match &self.backing {
-			TextureBufferBacking::New(desc, _) => desc.dimensions.get_dimension(),
-			TextureBufferBacking::From(texture) => texture.view_dimension(),
+			TextureSamplerBufferBacking::WithBacking(texture) => texture.view_dimension(),
+			TextureSamplerBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
+			TextureSamplerBufferBacking::FromImage { .. } => TextureViewDimension::D2,
 		}
 	}
 
 	fn get_format(&self) -> TextureFormat {
 		match &self.backing {
-			TextureBufferBacking::New(desc, _) => desc.format,
-			TextureBufferBacking::From(texture) => texture.format(),
+			TextureSamplerBufferBacking::WithBacking(texture) => texture.format(),
+			TextureSamplerBufferBacking::New { format, .. } => *format,
+			TextureSamplerBufferBacking::FromImage { format, .. } => *format,
 		}
 	}
 }
@@ -148,10 +174,43 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 
 	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset> {
 		match &self.backing {
-			TextureBufferBacking::New(desc, sampler_desc) => {
-				Sarc::new(TextureAsset::create_with_sampler(gpu, *desc, *sampler_desc))
-			}
-			TextureBufferBacking::From(texture) => texture.clone(),
+			TextureSamplerBufferBacking::WithBacking(texture) => texture.clone(),
+
+			TextureSamplerBufferBacking::New {
+				label,
+				dimensions,
+				format,
+				usage,
+				aspect,
+				filter,
+				edges,
+				compare,
+			} => Sarc::new(TextureAsset::create_with_sampler(
+				gpu,
+				TextureAssetDescriptor {
+					label,
+					dimensions: *dimensions,
+					format: *format,
+					usage: *usage,
+					aspect: *aspect,
+				},
+				TextureAssetSamplerDescriptor {
+					filter: *filter,
+					edges: *edges,
+					compare: *compare,
+				},
+			)),
+
+			TextureSamplerBufferBacking::FromImage {
+				label,
+				image,
+				format,
+				usage,
+				filter,
+				edges,
+			} => Sarc::new(TextureAsset::from_image_with_sampler(
+				gpu, label, image, *format, *usage, *filter, *edges,
+			)),
 		}
 	}
 }

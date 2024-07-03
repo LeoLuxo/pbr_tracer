@@ -105,7 +105,9 @@ impl CompositeRenderer {
 			.include_texture(TextureSamplerBuffer::new(
 				"out_texture",
 				"out_sampler",
-				buffer::texture_sampler_buffer::TextureBufferBacking::From(compute_renderer.output_texture.clone()),
+				buffer::texture_sampler_buffer::TextureSamplerBufferBacking::WithBacking(
+					compute_renderer.output_texture.clone(),
+				),
 			))
 			.include_data_buffer(UniformBuffer::<Vec2<u32>>::from_buffer(
 				"viewport_size",
