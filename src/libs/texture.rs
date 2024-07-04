@@ -84,10 +84,27 @@ pub struct TextureAssetDescriptor<'a> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TextureAssetSamplerDescriptor {
+pub struct TextureAssetSamplerDescriptor<'a> {
+	pub label: &'a str,
+	pub dimensions: TextureAssetDimensions,
+	pub format: TextureFormat,
+	pub usage: Option<TextureUsages>,
+	pub aspect: TextureAspect,
 	pub filter: FilterMode,
 	pub edges: Edges,
 	pub compare: Option<CompareFunction>,
+}
+
+impl<'a> From<TextureAssetSamplerDescriptor<'a>> for TextureAssetDescriptor<'a> {
+	fn from(d: TextureAssetSamplerDescriptor<'a>) -> Self {
+		Self {
+			label: d.label,
+			dimensions: d.dimensions,
+			format: d.format,
+			usage: d.usage,
+			aspect: d.aspect,
+		}
+	}
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -152,14 +169,12 @@ impl TextureAsset {
 	) -> Self {
 		let texture = Self::create_with_sampler(
 			gpu,
-			TextureAssetDescriptor {
+			TextureAssetSamplerDescriptor {
 				label,
 				dimensions: TextureAssetDimensions::D2(img.dimensions().into()),
 				format,
 				usage,
 				aspect: TextureAspect::All,
-			},
-			TextureAssetSamplerDescriptor {
 				edges,
 				filter,
 				compare: None,
@@ -195,14 +210,12 @@ impl TextureAsset {
 	pub fn create_depth_texture(gpu: &Gpu, size: Extent2<u32>, label: &str) -> Self {
 		Self::create_with_sampler(
 			gpu,
-			TextureAssetDescriptor {
+			TextureAssetSamplerDescriptor {
 				label,
 				dimensions: TextureAssetDimensions::D2(size),
 				format: Self::DEFAULT_DEPTH_FORMAT,
 				usage: Some(TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING),
 				aspect: TextureAspect::DepthOnly,
-			},
-			TextureAssetSamplerDescriptor {
 				edges: Edges::ClampToEdge,
 				filter: FilterMode::Linear,
 				compare: Some(CompareFunction::LessEqual),
@@ -245,31 +258,27 @@ impl TextureAsset {
 		}
 	}
 
-	pub fn create_with_sampler(
-		gpu: &Gpu,
-		mut desc: TextureAssetDescriptor,
-		sampler_desc: TextureAssetSamplerDescriptor,
-	) -> Self {
+	pub fn create_with_sampler(gpu: &Gpu, mut desc: TextureAssetSamplerDescriptor) -> Self {
 		// If the texture is gonna be sampled, it needs to be bound with TEXTURE_BINDING
 		// anyway
 		desc.usage = desc.usage.map(|u| u | TextureUsages::TEXTURE_BINDING);
 
 		let sampler = Some(gpu.device.create_sampler(&SamplerDescriptor {
 			label: Some(&format!("{} Sampler", desc.label)),
-			address_mode_u: sampler_desc.edges.as_address_mode(),
-			address_mode_v: sampler_desc.edges.as_address_mode(),
-			address_mode_w: sampler_desc.edges.as_address_mode(),
-			mag_filter: sampler_desc.filter,
-			min_filter: sampler_desc.filter,
-			mipmap_filter: sampler_desc.filter,
-			border_color: sampler_desc.edges.get_border_color(),
-			compare: sampler_desc.compare,
+			address_mode_u: desc.edges.as_address_mode(),
+			address_mode_v: desc.edges.as_address_mode(),
+			address_mode_w: desc.edges.as_address_mode(),
+			mag_filter: desc.filter,
+			min_filter: desc.filter,
+			mipmap_filter: desc.filter,
+			border_color: desc.edges.get_border_color(),
+			compare: desc.compare,
 			..Default::default()
 		}));
 
 		Self {
 			sampler,
-			..Self::create(gpu, desc)
+			..Self::create(gpu, desc.into())
 		}
 	}
 

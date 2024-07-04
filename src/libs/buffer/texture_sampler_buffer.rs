@@ -187,14 +187,12 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 				compare,
 			} => Sarc::new(TextureAsset::create_with_sampler(
 				gpu,
-				TextureAssetDescriptor {
+				TextureAssetSamplerDescriptor {
 					label,
 					dimensions: *dimensions,
 					format: *format,
 					usage: *usage,
 					aspect: *aspect,
-				},
-				TextureAssetSamplerDescriptor {
 					filter: *filter,
 					edges: *edges,
 					compare: *compare,
@@ -212,5 +210,9 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 				gpu, label, image, *format, *usage, *filter, *edges,
 			)),
 		}
+	}
+
+	fn is_output_texture(&self) -> bool {
+		false
 	}
 }
