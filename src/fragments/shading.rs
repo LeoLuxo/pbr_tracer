@@ -53,7 +53,7 @@ impl ShaderFragment for CelShading {
 
 		ShaderBuilder::new()
 			.include_path("/shading/cel_shading.wgsl")
-			.include_value("sun_direction", vec3!(1.0, -1.0, 1.0).normalized())
+			.include_value("sun_direction", vec3!(1.0, -1.0, 0.0).normalized())
 			.include_texture(gradient)
 			.into()
 	}

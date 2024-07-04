@@ -156,11 +156,4 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 			} => Sarc::new(Tex::from_image(gpu, label, image, *format, *usage, None)),
 		}
 	}
-
-	fn is_output_texture(&self) -> bool {
-		matches!(
-			self.access,
-			StorageTextureAccess::ReadWrite | StorageTextureAccess::WriteOnly
-		)
-	}
 }

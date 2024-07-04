@@ -4,7 +4,7 @@ use wgpu::{Texture, TextureAspect, TextureFormat, TextureUsages};
 use super::{
 	buffer::texture_buffer::TextureBuffer,
 	smart_arc::Sarc,
-	texture::{Tex, TexDescriptor, TextureAssetDimensions},
+	texture::{TextureAsset, TextureAssetDescriptor, TextureAssetDimensions},
 };
 use crate::libs::shader::Shader;
 
@@ -22,7 +22,7 @@ pub trait ShaderFragment: Sync + Send {
 /// `fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f`
 pub trait Renderer: ShaderFragment {
 	fn default_color_texture(resolution: Extent2<u32>) -> TextureBuffer<'static> {
-		TexDescriptor {
+		TextureAssetDescriptor {
 			label: "Default Renderer output texture",
 			dimensions: TextureAssetDimensions::D2(resolution),
 			format: TextureFormat::Rgba32Float,
@@ -31,7 +31,7 @@ pub trait Renderer: ShaderFragment {
 		}
 	}
 
-	fn output_textures(&self, resolution: Extent2<u32>) -> Vec<TexDescriptor> {
+	fn output_textures(&self, resolution: Extent2<u32>) -> Vec<TextureAssetDescriptor> {
 		vec![Self::default_color_texture(resolution)]
 	}
 }

@@ -222,8 +222,4 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 			)),
 		}
 	}
-
-	fn is_output_texture(&self) -> bool {
-		false
-	}
 }

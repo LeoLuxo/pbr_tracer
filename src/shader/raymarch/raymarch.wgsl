@@ -5,7 +5,7 @@
 
 fn intersect_scene(ray_origin: vec3f, ray_dir: vec3f) -> Intersection {
 	let object = Object(vec3f(1, 0, 0));
-	var intersection = Intersection(false, object, vec3f(0), ray_dir, -ray_dir);
+	var intersection = Intersection(false, object, vec3f(0), vec3f(0), -ray_dir);
 	
 	var iters: u32;
 	var t = settings.min_march;

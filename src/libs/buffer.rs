@@ -100,9 +100,8 @@ pub trait DataBufferDescriptor: ShaderBufferDescriptor {
 }
 
 pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex>;
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup;
-	fn is_output_texture(&self) -> bool;
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset>;
+	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &TextureAsset) -> BindGroup;
 }
 
 /*
@@ -156,8 +155,7 @@ impl ShaderBuffer for GenericDataBuffer {
 #[derive(bevy::Component, Debug)]
 pub struct GenericTextureBuffer {
 	pub label: String,
-	pub is_output: bool,
-	pub texture: Sarc<Tex>,
+	pub texture: Sarc<TextureAsset>,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
 }
@@ -165,14 +163,12 @@ pub struct GenericTextureBuffer {
 impl GenericTextureBuffer {
 	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn TextureBufferDescriptor) -> Self {
 		let label = shader_buffer.label("(as GenericTextureBuffer)");
-		let is_output = shader_buffer.is_output_texture();
 		let texture = shader_buffer.create_texture(gpu);
 		let bind_group_layout = shader_buffer.create_bind_group_layout(gpu, visibility);
 		let bind_group = shader_buffer.create_bind_group(gpu, &bind_group_layout, &texture);
 
 		GenericTextureBuffer {
 			label,
-			is_output,
 			texture,
 			bind_group_layout,
 			bind_group,

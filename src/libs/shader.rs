@@ -286,7 +286,7 @@ impl Shader {
 				);
 
 				let buffer = GenericDataBuffer::new(state.gpu, state.shader_stages, data_buffer.as_ref());
-				let shader_source = ShaderSource::from_data_buffer(source, buffer, state.bind_group_offset);
+				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
 				state.bind_group_offset += 1;
 
@@ -302,7 +302,7 @@ impl Shader {
 				);
 
 				let buffer = GenericTextureBuffer::new(state.gpu, state.shader_stages, texture_buffer.as_ref());
-				let shader_source = ShaderSource::from_texture_buffer(source, buffer, state.bind_group_offset);
+				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
 
 				state.bind_group_offset += 1;
 
@@ -447,7 +447,6 @@ where
 pub struct ShaderSource {
 	pub source: String,
 	pub buffers: BufferMapping,
-	pub output_textures: Vec<Sarc<Tex>>,
 }
 
 impl ShaderSource {
@@ -462,31 +461,15 @@ impl ShaderSource {
 		}
 	}
 
-	pub fn from_data_buffer(source: String, buffer: GenericDataBuffer, bind_group_index: u32) -> Self {
-		let output_textures = vec![];
-		let buffers =
-			BufferMapping(hash_map!(bind_group_index: Sarc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)));
-
+	pub fn from_buffer<B>(source: String, buffer: B, bind_group_index: u32) -> Self
+	where
+		B: ShaderBuffer + Sync + Send + 'static,
+	{
 		Self {
 			source,
-			buffers,
-			output_textures,
-		}
-	}
-
-	pub fn from_texture_buffer(source: String, buffer: GenericTextureBuffer, bind_group_index: u32) -> Self {
-		let output_textures = if buffer.is_output {
-			vec![buffer.texture.clone()]
-		} else {
-			vec![]
-		};
-		let buffers =
-			BufferMapping(hash_map!(bind_group_index: Sarc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)));
-
-		Self {
-			source,
-			buffers,
-			output_textures,
+			buffers: BufferMapping(
+				hash_map!(bind_group_index: Sarc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)),
+			),
 		}
 	}
 
@@ -509,7 +492,6 @@ impl ShaderSource {
 		CompiledShader {
 			shader_module,
 			buffers: self.buffers,
-			output_textures: self.output_textures,
 		}
 	}
 
@@ -533,5 +515,4 @@ impl Display for ShaderSource {
 pub struct CompiledShader {
 	pub shader_module: ShaderModule,
 	pub buffers: BufferMapping,
-	pub output_textures: Vec<Sarc<Tex>>,
 }
