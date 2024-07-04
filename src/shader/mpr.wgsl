@@ -14,12 +14,6 @@ struct Object {
 fn render_pixel(pixel_coord: vec2u, pixel_size: vec2u) {
 	let coord = (vec2f(pixel_coord) - vec2f(pixel_size) / 2.0) / f32(pixel_size.y);
 	
-	let color = render(coord);
-	
-	textureStore(output_color, pixel_coord, color);
-}
-
-fn render(coord: vec2f) -> vec4f {
 	let ray_origin = vec3f(0, 0, -5);
 	let ray_target = vec3f(0);
 	
@@ -34,8 +28,13 @@ fn render(coord: vec2f) -> vec4f {
 	var color = shade(intersection);
 	
 	color = post_processing_pipeline(coord, color);
+	
+	let depth = vec4f(intersection.position.zzz, 1.0);
+	let normal = vec4f(intersection.normal, 1.0);
 
-	return color;
+	textureStore(output_color, pixel_coord, color);
+	textureStore(output_depth, pixel_coord, depth);
+	textureStore(output_normal, pixel_coord, normal);
 }
 
 fn camera_look_at(position: vec3f, target_position: vec3f) -> mat3x3f {

@@ -1,9 +1,11 @@
-use brainrot::path;
+use brainrot::{path, vek::Extent2};
+use wgpu::{TextureAspect, TextureFormat, TextureUsages};
 
 use super::post_processing::PostProcessingPipeline;
 use crate::libs::{
 	shader::{Shader, ShaderBuilder},
 	shader_fragment::{Renderer, ShaderFragment},
+	texture::{TexDescriptor, TextureAssetDimensions},
 };
 
 /*
@@ -41,6 +43,29 @@ where
 	I: Intersector,
 	S: Shading,
 {
+	fn output_textures(&self, resolution: Extent2<u32>) -> Vec<(String, TexDescriptor)> {
+		let depth = TexDescriptor {
+			label: "Depth output texture",
+			dimensions: TextureAssetDimensions::D2(resolution),
+			format: TextureFormat::Rgba32Float,
+			usage: Some(TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC),
+			aspect: TextureAspect::All,
+		};
+
+		let normal = TexDescriptor {
+			label: "Normal output texture",
+			dimensions: TextureAssetDimensions::D2(resolution),
+			format: TextureFormat::Rgba32Float,
+			usage: Some(TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC),
+			aspect: TextureAspect::All,
+		};
+
+		std::vec![
+			("output_color".to_string(), self.default_color_texture(resolution)),
+			("output_depth".to_string(), depth),
+			("output_normal".to_string(), normal),
+		]
+	}
 }
 
 impl<I, S> ShaderFragment for MultiPurposeRenderer<I, S>
