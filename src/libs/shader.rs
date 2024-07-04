@@ -20,7 +20,7 @@ use super::{
 	},
 	embed::Assets,
 	smart_arc::Sarc,
-	texture::TextureAsset,
+	texture::Tex,
 };
 use crate::core::gpu::Gpu;
 
@@ -447,7 +447,7 @@ where
 pub struct ShaderSource {
 	pub source: String,
 	pub buffers: BufferMapping,
-	pub output_textures: Vec<Sarc<TextureAsset>>,
+	pub output_textures: Vec<Sarc<Tex>>,
 }
 
 impl ShaderSource {
@@ -533,5 +533,5 @@ impl Display for ShaderSource {
 pub struct CompiledShader {
 	pub shader_module: ShaderModule,
 	pub buffers: BufferMapping,
-	pub output_textures: Vec<Sarc<TextureAsset>>,
+	pub output_textures: Vec<Sarc<Tex>>,
 }

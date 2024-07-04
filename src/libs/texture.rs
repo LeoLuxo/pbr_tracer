@@ -4,9 +4,9 @@ use brainrot::vek::{Extent2, Extent3};
 use image::GenericImageView;
 use wgpu::{
 	AddressMode, AstcBlock, AstcChannel, CompareFunction, Extent3d, FilterMode, ImageCopyTexture, ImageDataLayout,
-	Origin3d, Sampler, SamplerBorderColor, SamplerDescriptor, StorageTextureAccess, TextureAspect, TextureDescriptor,
-	TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor,
-	TextureViewDimension,
+	Origin3d, Sampler, SamplerBorderColor, SamplerDescriptor, StorageTextureAccess, Texture, TextureAspect,
+	TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureView,
+	TextureViewDescriptor, TextureViewDimension,
 };
 
 use crate::core::gpu::Gpu;
@@ -75,7 +75,7 @@ impl TextureAssetDimensions {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TextureAssetDescriptor<'a> {
+pub struct TexDescriptor<'a> {
 	pub label: &'a str,
 	pub dimensions: TextureAssetDimensions,
 	pub format: TextureFormat,
@@ -84,146 +84,105 @@ pub struct TextureAssetDescriptor<'a> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TextureAssetSamplerDescriptor<'a> {
-	pub label: &'a str,
-	pub dimensions: TextureAssetDimensions,
-	pub format: TextureFormat,
-	pub usage: Option<TextureUsages>,
-	pub aspect: TextureAspect,
+pub struct TexSamplerDescriptor {
 	pub filter: FilterMode,
-	pub edges: Edges,
+	pub edges: SamplerEdges,
 	pub compare: Option<CompareFunction>,
 }
 
-impl<'a> From<TextureAssetSamplerDescriptor<'a>> for TextureAssetDescriptor<'a> {
-	fn from(d: TextureAssetSamplerDescriptor<'a>) -> Self {
-		Self {
-			label: d.label,
-			dimensions: d.dimensions,
-			format: d.format,
-			usage: d.usage,
-			aspect: d.aspect,
-		}
-	}
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Edges {
+pub enum SamplerEdges {
 	ClampToEdge,
 	Repeat,
 	MirrorRepeat,
 	ClampToColor(SamplerBorderColor),
 }
 
-impl Edges {
+impl SamplerEdges {
 	pub fn as_address_mode(&self) -> AddressMode {
 		match self {
-			Edges::ClampToEdge => AddressMode::ClampToEdge,
-			Edges::Repeat => AddressMode::Repeat,
-			Edges::MirrorRepeat => AddressMode::MirrorRepeat,
-			Edges::ClampToColor(_) => AddressMode::ClampToBorder,
+			SamplerEdges::ClampToEdge => AddressMode::ClampToEdge,
+			SamplerEdges::Repeat => AddressMode::Repeat,
+			SamplerEdges::MirrorRepeat => AddressMode::MirrorRepeat,
+			SamplerEdges::ClampToColor(_) => AddressMode::ClampToBorder,
 		}
 	}
 
 	pub fn get_border_color(&self) -> Option<SamplerBorderColor> {
 		match self {
-			Edges::ClampToColor(color) => Some(*color),
+			SamplerEdges::ClampToColor(color) => Some(*color),
 			_ => None,
 		}
 	}
 }
 
 #[derive(Debug)]
-pub struct TextureAsset {
+pub struct Tex {
+	label: String,
 	view_dimension: TextureViewDimension,
 	aspect: TextureAspect,
-	pub texture: wgpu::Texture,
+	pub texture: Texture,
 	pub view: TextureView,
 	pub sampler: Option<Sampler>,
 }
 
-impl TextureAsset {
+impl Tex {
 	pub const DEFAULT_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
-	pub fn from_image_bytes_with_sampler(
+	pub fn from_image_bytes(
 		gpu: &Gpu,
+		label: &str,
 		bytes: &[u8],
 		format: TextureFormat,
-		filter: FilterMode,
-		edges: Edges,
 		usage: Option<TextureUsages>,
-		label: &str,
+		sampler: Option<TexSamplerDescriptor>,
 	) -> Self {
 		let img = image::load_from_memory(bytes).expect("Couldn't load image bytes from memory");
-		Self::from_image_with_sampler(gpu, label, &img, format, usage, filter, edges)
+		Self::from_image(gpu, label, &img, format, usage, sampler)
 	}
 
-	pub fn from_image_with_sampler(
+	pub fn from_image(
 		gpu: &Gpu,
 		label: &str,
 		img: &image::DynamicImage,
 		format: TextureFormat,
 		usage: Option<TextureUsages>,
-		filter: FilterMode,
-		edges: Edges,
-	) -> Self {
-		let texture = Self::create_with_sampler(
-			gpu,
-			TextureAssetSamplerDescriptor {
-				label,
-				dimensions: TextureAssetDimensions::D2(img.dimensions().into()),
-				format,
-				usage,
-				aspect: TextureAspect::All,
-				edges,
-				filter,
-				compare: None,
-			},
-		);
-
-		texture.upload_image(gpu, img);
-		texture
-	}
-
-	pub fn from_image_storage(
-		gpu: &Gpu,
-		label: &str,
-		img: &image::DynamicImage,
-		format: TextureFormat,
-		usage: Option<TextureUsages>,
+		sampler: Option<TexSamplerDescriptor>,
 	) -> Self {
 		let texture = Self::create(
 			gpu,
-			TextureAssetDescriptor {
+			TexDescriptor {
 				label,
 				dimensions: TextureAssetDimensions::D2(img.dimensions().into()),
 				format,
 				usage,
 				aspect: TextureAspect::All,
 			},
+			sampler,
 		);
 
 		texture.upload_image(gpu, img);
 		texture
 	}
 
-	pub fn create_depth_texture(gpu: &Gpu, size: Extent2<u32>, label: &str) -> Self {
-		Self::create_with_sampler(
-			gpu,
-			TextureAssetSamplerDescriptor {
-				label,
-				dimensions: TextureAssetDimensions::D2(size),
-				format: Self::DEFAULT_DEPTH_FORMAT,
-				usage: Some(TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING),
-				aspect: TextureAspect::DepthOnly,
-				edges: Edges::ClampToEdge,
-				filter: FilterMode::Linear,
-				compare: Some(CompareFunction::LessEqual),
-			},
-		)
-	}
+	// pub fn create_depth_texture(gpu: &Gpu, size: Extent2<u32>, label: &str) -> Self {
+	// 	Self::create_with_sampler(
+	// 		gpu,
+	// 		TexSamplerDescriptor {
+	// 			label,
+	// 			dimensions: TextureAssetDimensions::D2(size),
+	// 			format: Self::DEFAULT_DEPTH_FORMAT,
+	// 			usage: Some(TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING),
+	// 			aspect: TextureAspect::DepthOnly,
+	// 			edges: SamplerEdges::ClampToEdge,
+	// 			filter: FilterMode::Linear,
+	// 			compare: Some(CompareFunction::LessEqual),
+	// 		},
+	// 	)
+	// }
 
-	pub fn create(gpu: &Gpu, desc: TextureAssetDescriptor) -> Self {
+	pub fn create(gpu: &Gpu, desc: TexDescriptor, sampler: Option<TexSamplerDescriptor>) -> Self {
+		let label = desc.label.to_owned();
 		let view_dimension = desc.dimensions.get_dimension();
 		let aspect = desc.aspect;
 
@@ -236,7 +195,8 @@ impl TextureAsset {
 			format: desc.format,
 			usage: desc.usage.unwrap_or(TextureUsages::empty())
 				| TextureUsages::COPY_DST
-				| TextureUsages::STORAGE_BINDING,
+				| TextureUsages::STORAGE_BINDING
+				| TextureUsages::TEXTURE_BINDING,
 			// TODO: Clean up usages
 			view_formats: &[],
 		});
@@ -249,37 +209,35 @@ impl TextureAsset {
 			..Default::default()
 		});
 
-		Self {
+		let mut tex = Self {
+			label,
 			view_dimension,
 			aspect,
 			texture,
 			view,
 			sampler: None,
+		};
+
+		if let Some(sampler_desc) = sampler {
+			tex.add_sampler(gpu, sampler_desc);
 		}
+
+		tex
 	}
 
-	pub fn create_with_sampler(gpu: &Gpu, mut desc: TextureAssetSamplerDescriptor) -> Self {
-		// If the texture is gonna be sampled, it needs to be bound with TEXTURE_BINDING
-		// anyway
-		desc.usage = desc.usage.map(|u| u | TextureUsages::TEXTURE_BINDING);
-
-		let sampler = Some(gpu.device.create_sampler(&SamplerDescriptor {
-			label: Some(&format!("{} Sampler", desc.label)),
-			address_mode_u: desc.edges.as_address_mode(),
-			address_mode_v: desc.edges.as_address_mode(),
-			address_mode_w: desc.edges.as_address_mode(),
-			mag_filter: desc.filter,
-			min_filter: desc.filter,
-			mipmap_filter: desc.filter,
-			border_color: desc.edges.get_border_color(),
-			compare: desc.compare,
+	pub fn add_sampler(&mut self, gpu: &Gpu, mut sampler_desc: TexSamplerDescriptor) {
+		self.sampler = Some(gpu.device.create_sampler(&SamplerDescriptor {
+			label: Some(&format!("{} Sampler", self.label)),
+			address_mode_u: sampler_desc.edges.as_address_mode(),
+			address_mode_v: sampler_desc.edges.as_address_mode(),
+			address_mode_w: sampler_desc.edges.as_address_mode(),
+			mag_filter: sampler_desc.filter,
+			min_filter: sampler_desc.filter,
+			mipmap_filter: sampler_desc.filter,
+			border_color: sampler_desc.edges.get_border_color(),
+			compare: sampler_desc.compare,
 			..Default::default()
 		}));
-
-		Self {
-			sampler,
-			..Self::create(gpu, desc.into())
-		}
 	}
 
 	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8]) {

@@ -10,9 +10,7 @@ use crate::{
 	core::gpu::Gpu,
 	libs::{
 		smart_arc::Sarc,
-		texture::{
-			self, Edges, TextureAsset, TextureAssetDescriptor, TextureAssetDimensions, TextureAssetSamplerDescriptor,
-		},
+		texture::{self, SamplerEdges, Tex, TexDescriptor, TexSamplerDescriptor, TextureAssetDimensions},
 	},
 };
 
@@ -29,7 +27,7 @@ pub struct TextureSamplerBuffer<'a> {
 }
 
 pub enum TextureSamplerBufferBacking<'a> {
-	WithBacking(Sarc<TextureAsset>),
+	WithBacking(Sarc<Tex>),
 	New {
 		label: &'a str,
 		dimensions: TextureAssetDimensions,
@@ -37,7 +35,7 @@ pub enum TextureSamplerBufferBacking<'a> {
 		usage: Option<TextureUsages>,
 		aspect: TextureAspect,
 		filter: FilterMode,
-		edges: Edges,
+		edges: SamplerEdges,
 		compare: Option<CompareFunction>,
 	},
 	FromImage {
@@ -46,7 +44,8 @@ pub enum TextureSamplerBufferBacking<'a> {
 		format: TextureFormat,
 		usage: Option<TextureUsages>,
 		filter: FilterMode,
-		edges: Edges,
+		edges: SamplerEdges,
+		compare: Option<CompareFunction>,
 	},
 }
 
@@ -150,7 +149,7 @@ impl ShaderBufferDescriptor for TextureSamplerBuffer<'_> {
 }
 
 impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &TextureAsset) -> BindGroup {
+	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup {
 		gpu.device.create_bind_group(&BindGroupDescriptor {
 			label: Some(&self.label("Bind Group")),
 			layout,
@@ -172,7 +171,7 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 		})
 	}
 
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset> {
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex> {
 		match &self.backing {
 			TextureSamplerBufferBacking::WithBacking(texture) => texture.clone(),
 
@@ -185,18 +184,20 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 				filter,
 				edges,
 				compare,
-			} => Sarc::new(TextureAsset::create_with_sampler(
+			} => Sarc::new(Tex::create(
 				gpu,
-				TextureAssetSamplerDescriptor {
+				TexDescriptor {
 					label,
 					dimensions: *dimensions,
 					format: *format,
 					usage: *usage,
 					aspect: *aspect,
+				},
+				Some(TexSamplerDescriptor {
 					filter: *filter,
 					edges: *edges,
 					compare: *compare,
-				},
+				}),
 			)),
 
 			TextureSamplerBufferBacking::FromImage {
@@ -206,8 +207,18 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 				usage,
 				filter,
 				edges,
-			} => Sarc::new(TextureAsset::from_image_with_sampler(
-				gpu, label, image, *format, *usage, *filter, *edges,
+				compare,
+			} => Sarc::new(Tex::from_image(
+				gpu,
+				label,
+				image,
+				*format,
+				*usage,
+				Some(TexSamplerDescriptor {
+					filter: *filter,
+					edges: *edges,
+					compare: *compare,
+				}),
 			)),
 		}
 	}

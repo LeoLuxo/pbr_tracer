@@ -12,7 +12,7 @@ use brainrot::{
 };
 use wgpu::{BindGroup, BindGroupLayout, Buffer, BufferAddress, ComputePass, RenderPass, ShaderStages};
 
-use super::{smart_arc::Sarc, texture::TextureAsset};
+use super::{smart_arc::Sarc, texture::Tex};
 use crate::core::{gameloop::PreRender, gpu::Gpu};
 
 /*
@@ -100,8 +100,8 @@ pub trait DataBufferDescriptor: ShaderBufferDescriptor {
 }
 
 pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset>;
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &TextureAsset) -> BindGroup;
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex>;
+	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup;
 	fn is_output_texture(&self) -> bool;
 }
 
@@ -157,7 +157,7 @@ impl ShaderBuffer for GenericDataBuffer {
 pub struct GenericTextureBuffer {
 	pub label: String,
 	pub is_output: bool,
-	pub texture: Sarc<TextureAsset>,
+	pub texture: Sarc<Tex>,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
 }

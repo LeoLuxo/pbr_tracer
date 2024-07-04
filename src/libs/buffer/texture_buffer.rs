@@ -10,7 +10,7 @@ use crate::{
 	core::gpu::Gpu,
 	libs::{
 		smart_arc::Sarc,
-		texture::{self, TextureAsset, TextureAssetDescriptor, TextureAssetDimensions},
+		texture::{self, Tex, TexDescriptor, TextureAssetDimensions},
 	},
 };
 
@@ -27,7 +27,7 @@ pub struct TextureBuffer<'a> {
 }
 
 pub enum TextureBufferBacking<'a> {
-	WithBacking(Sarc<TextureAsset>),
+	WithBacking(Sarc<Tex>),
 	New {
 		label: &'a str,
 		dimensions: TextureAssetDimensions,
@@ -115,7 +115,7 @@ impl ShaderBufferDescriptor for TextureBuffer<'_> {
 }
 
 impl TextureBufferDescriptor for TextureBuffer<'_> {
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &TextureAsset) -> BindGroup {
+	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup {
 		gpu.device.create_bind_group(&BindGroupDescriptor {
 			label: Some(&self.label("Bind Group")),
 			layout,
@@ -126,7 +126,7 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 		})
 	}
 
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset> {
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex> {
 		match &self.backing {
 			TextureBufferBacking::WithBacking(texture) => texture.clone(),
 
@@ -136,15 +136,16 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 				format,
 				usage,
 				aspect,
-			} => Sarc::new(TextureAsset::create(
+			} => Sarc::new(Tex::create(
 				gpu,
-				TextureAssetDescriptor {
+				TexDescriptor {
 					label,
 					dimensions: *dimensions,
 					format: *format,
 					usage: *usage,
 					aspect: *aspect,
 				},
+				None,
 			)),
 
 			TextureBufferBacking::FromImage {
@@ -152,7 +153,7 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 				image,
 				format,
 				usage,
-			} => Sarc::new(TextureAsset::from_image_storage(gpu, label, image, *format, *usage)),
+			} => Sarc::new(Tex::from_image(gpu, label, image, *format, *usage, None)),
 		}
 	}
 

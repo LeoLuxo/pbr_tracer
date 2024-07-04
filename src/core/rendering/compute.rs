@@ -21,7 +21,7 @@ use crate::{
 		shader::{CompiledShader, ShaderBuilder},
 		shader_fragment::{Renderer, ShaderFragment},
 		smart_arc::Sarc,
-		texture::{Edges, TextureAsset, TextureAssetDescriptor, TextureAssetDimensions, TextureAssetSamplerDescriptor},
+		texture::{SamplerEdges, Tex, TexDescriptor, TextureAssetDimensions},
 	},
 	ShaderAssets,
 };
@@ -65,24 +65,23 @@ pub struct ComputeRenderPass;
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
 	pipeline: ComputePipeline,
-	pub output_texture: Sarc<TextureAsset>,
-	shader: CompiledShader,
+	pub shader: CompiledShader,
 }
 
 impl ComputeRenderer {
 	pub fn new(gpu: &Gpu, resolution: ScreenSize, filter_mode: FilterMode, renderer: &dyn ShaderFragment) -> Self {
 		// The output texture that the compute will write to
-		let output_texture = Sarc::new(TextureAsset::create_with_sampler(
+		let output_texture = Sarc::new(Tex::create_with_sampler(
 			gpu,
-			TextureAssetDescriptor {
+			TexDescriptor {
 				label: "Compute Renderer output",
 				dimensions: TextureAssetDimensions::D2(resolution),
 				format: TextureFormat::Rgba32Float,
 				usage: Some(TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC),
 				aspect: TextureAspect::All,
 			},
-			TextureAssetSamplerDescriptor {
-				edges: Edges::ClampToColor(SamplerBorderColor::TransparentBlack),
+			SamplerDescriptor {
+				edges: SamplerEdges::ClampToColor(SamplerBorderColor::TransparentBlack),
 				filter: filter_mode,
 				compare: None,
 			},
