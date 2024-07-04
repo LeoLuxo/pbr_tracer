@@ -8,20 +8,20 @@ use brainrot::{
 };
 use wgpu::{
 	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
-	SamplerBorderColor, ShaderStages, StorageTextureAccess, TextureAspect, TextureFormat, TextureUsages,
+	SamplerBorderColor, ShaderStages, StorageTextureAccess,
 };
 
 use crate::{
 	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	libs::{
 		buffer::{
-			texture_buffer::{TextureBuffer, TextureBufferBacking},
+			storage_texture_buffer::{StorageTextureBuffer, StorageTextureBufferBacking},
 			BufferMappingApplicable,
 		},
 		shader::{CompiledShader, ShaderBuilder},
-		shader_fragment::{Renderer, ShaderFragment},
+		shader_fragment::Renderer,
 		smart_arc::Sarc,
-		texture::{SamplerEdges, Tex, TexDescriptor, TextureAssetDimensions},
+		texture::{SamplerEdges, Tex, TexSamplerDescriptor},
 	},
 	ShaderAssets,
 };
@@ -64,38 +64,46 @@ pub struct ComputeRenderPass;
 
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
+	resolution: ScreenSize,
 	pipeline: ComputePipeline,
-	pub shader: CompiledShader,
+	shader: CompiledShader,
+	pub output_textures: Vec<Sarc<Tex>>,
 }
 
 impl ComputeRenderer {
-	pub fn new(gpu: &Gpu, resolution: ScreenSize, filter_mode: FilterMode, renderer: &dyn ShaderFragment) -> Self {
-		// The output texture that the compute will write to
-		let output_texture = Sarc::new(Tex::create_with_sampler(
-			gpu,
-			TexDescriptor {
-				label: "Compute Renderer output",
-				dimensions: TextureAssetDimensions::D2(resolution),
-				format: TextureFormat::Rgba32Float,
-				usage: Some(TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC),
-				aspect: TextureAspect::All,
-			},
-			SamplerDescriptor {
-				edges: SamplerEdges::ClampToColor(SamplerBorderColor::TransparentBlack),
-				filter: filter_mode,
-				compare: None,
-			},
-		));
-
+	pub fn new(gpu: &Gpu, resolution: ScreenSize, filter_mode: FilterMode, renderer: &dyn Renderer) -> Self {
 		// Dynamically create shader from the renderer
-		let shader = ShaderBuilder::new()
-			.include_texture(TextureBuffer::new(
-				"out_texture",
+		let mut shader = ShaderBuilder::new();
+		shader.include_path("compute.wgsl").include(renderer.shader());
+		// .include_value("out_resolution", resolution);
+
+		// The sampler that will be added to all output textures
+		let output_sampler = Some(TexSamplerDescriptor {
+			edges: SamplerEdges::ClampToColor(SamplerBorderColor::TransparentBlack),
+			filter: filter_mode,
+			compare: None,
+		});
+
+		// The list of output textures given by the renderer
+		let output_textures = renderer
+			.output_textures(resolution)
+			.into_iter()
+			.map(|(name, desc)| (name, Sarc::new(Tex::create(gpu, desc, output_sampler))))
+			.collect::<Vec<_>>();
+
+		// Add the output textures to the shader
+		for (var_name, tex) in &output_textures {
+			shader.include_texture(StorageTextureBuffer::new(
+				var_name,
 				StorageTextureAccess::ReadWrite,
-				TextureBufferBacking::WithBacking(output_texture.clone()),
-			))
-			.include_path("compute.wgsl")
-			.include(renderer.shader())
+				StorageTextureBufferBacking::WithBacking(tex.clone()),
+			));
+		}
+
+		let output_textures = output_textures.into_iter().map(|(_, tex)| tex).collect::<Vec<_>>();
+
+		// Compile the shader
+		let shader = shader
 			.build(gpu, &ShaderAssets, ShaderStages::COMPUTE, 0)
 			.expect("Couldn't build shader");
 
@@ -113,9 +121,10 @@ impl ComputeRenderer {
 		});
 
 		Self {
+			resolution,
 			pipeline,
-			output_texture,
 			shader,
+			output_textures,
 		}
 	}
 }
@@ -131,9 +140,6 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 		label: Some("ComputeRenderer Command Encoder"),
 	});
 
-	let out_width = compute_renderer.output_texture.texture.width();
-	let out_height = compute_renderer.output_texture.texture.height();
-
 	{
 		let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
 			label: Some("ComputeRenderer Compute Pass"),
@@ -144,7 +150,8 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 
 		compute_pass.apply_buffer_mapping(&compute_renderer.shader.buffers);
 
-		compute_pass.dispatch_workgroups(out_width, out_height, 1);
+		// TODO: Change workgroup size to 64
+		compute_pass.dispatch_workgroups(compute_renderer.resolution.w, compute_renderer.resolution.h, 1);
 	}
 
 	render_target.command_queue.push(encoder.finish());

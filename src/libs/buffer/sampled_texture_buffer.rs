@@ -20,13 +20,13 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct TextureSamplerBuffer<'a> {
+pub struct SampledTextureBuffer<'a> {
 	pub texture_var_name: String,
 	pub sampler_var_name: String,
-	pub backing: TextureSamplerBufferBacking<'a>,
+	pub backing: SampledTextureBufferBacking<'a>,
 }
 
-pub enum TextureSamplerBufferBacking<'a> {
+pub enum SampledTextureBufferBacking<'a> {
 	WithBacking(Sarc<Tex>),
 	New {
 		label: &'a str,
@@ -49,11 +49,11 @@ pub enum TextureSamplerBufferBacking<'a> {
 	},
 }
 
-impl<'a> TextureSamplerBuffer<'a> {
+impl<'a> SampledTextureBuffer<'a> {
 	pub fn new(
 		texture_var_name: impl Into<String>,
 		sampler_var_name: impl Into<String>,
-		backing: TextureSamplerBufferBacking<'a>,
+		backing: SampledTextureBufferBacking<'a>,
 	) -> Self {
 		Self {
 			texture_var_name: texture_var_name.into(),
@@ -64,32 +64,32 @@ impl<'a> TextureSamplerBuffer<'a> {
 
 	fn get_dimension(&self) -> TextureDimension {
 		match &self.backing {
-			TextureSamplerBufferBacking::WithBacking(texture) => texture.dimension(),
-			TextureSamplerBufferBacking::New { dimensions, .. } => {
+			SampledTextureBufferBacking::WithBacking(texture) => texture.dimension(),
+			SampledTextureBufferBacking::New { dimensions, .. } => {
 				dimensions.get_dimension().compatible_texture_dimension()
 			}
-			TextureSamplerBufferBacking::FromImage { .. } => TextureDimension::D2,
+			SampledTextureBufferBacking::FromImage { .. } => TextureDimension::D2,
 		}
 	}
 
 	fn get_view_dimension(&self) -> TextureViewDimension {
 		match &self.backing {
-			TextureSamplerBufferBacking::WithBacking(texture) => texture.view_dimension(),
-			TextureSamplerBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
-			TextureSamplerBufferBacking::FromImage { .. } => TextureViewDimension::D2,
+			SampledTextureBufferBacking::WithBacking(texture) => texture.view_dimension(),
+			SampledTextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
+			SampledTextureBufferBacking::FromImage { .. } => TextureViewDimension::D2,
 		}
 	}
 
 	fn get_format(&self) -> TextureFormat {
 		match &self.backing {
-			TextureSamplerBufferBacking::WithBacking(texture) => texture.format(),
-			TextureSamplerBufferBacking::New { format, .. } => *format,
-			TextureSamplerBufferBacking::FromImage { format, .. } => *format,
+			SampledTextureBufferBacking::WithBacking(texture) => texture.format(),
+			SampledTextureBufferBacking::New { format, .. } => *format,
+			SampledTextureBufferBacking::FromImage { format, .. } => *format,
 		}
 	}
 }
 
-impl ShaderBufferDescriptor for TextureSamplerBuffer<'_> {
+impl ShaderBufferDescriptor for SampledTextureBuffer<'_> {
 	fn label(&self, label_type: &str) -> String {
 		format!(
 			"TextureSamplerBuffer \"{}/{}\" {}",
@@ -148,7 +148,7 @@ impl ShaderBufferDescriptor for TextureSamplerBuffer<'_> {
 	}
 }
 
-impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
+impl TextureBufferDescriptor for SampledTextureBuffer<'_> {
 	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup {
 		gpu.device.create_bind_group(&BindGroupDescriptor {
 			label: Some(&self.label("Bind Group")),
@@ -173,9 +173,9 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 
 	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex> {
 		match &self.backing {
-			TextureSamplerBufferBacking::WithBacking(texture) => texture.clone(),
+			SampledTextureBufferBacking::WithBacking(texture) => texture.clone(),
 
-			TextureSamplerBufferBacking::New {
+			SampledTextureBufferBacking::New {
 				label,
 				dimensions,
 				format,
@@ -200,7 +200,7 @@ impl TextureBufferDescriptor for TextureSamplerBuffer<'_> {
 				}),
 			)),
 
-			TextureSamplerBufferBacking::FromImage {
+			SampledTextureBufferBacking::FromImage {
 				label,
 				image,
 				format,

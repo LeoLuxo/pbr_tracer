@@ -20,13 +20,13 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct TextureBuffer<'a> {
+pub struct StorageTextureBuffer<'a> {
 	pub var_name: String,
 	pub access: StorageTextureAccess,
-	pub backing: TextureBufferBacking<'a>,
+	pub backing: StorageTextureBufferBacking<'a>,
 }
 
-pub enum TextureBufferBacking<'a> {
+pub enum StorageTextureBufferBacking<'a> {
 	WithBacking(Sarc<Tex>),
 	New {
 		label: &'a str,
@@ -43,8 +43,12 @@ pub enum TextureBufferBacking<'a> {
 	},
 }
 
-impl<'a> TextureBuffer<'a> {
-	pub fn new(var_name: impl Into<String>, access: StorageTextureAccess, backing: TextureBufferBacking<'a>) -> Self {
+impl<'a> StorageTextureBuffer<'a> {
+	pub fn new(
+		var_name: impl Into<String>,
+		access: StorageTextureAccess,
+		backing: StorageTextureBufferBacking<'a>,
+	) -> Self {
 		Self {
 			var_name: var_name.into(),
 			access,
@@ -54,30 +58,32 @@ impl<'a> TextureBuffer<'a> {
 
 	fn get_dimension(&self) -> TextureDimension {
 		match &self.backing {
-			TextureBufferBacking::WithBacking(texture) => texture.dimension(),
-			TextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension().compatible_texture_dimension(),
-			TextureBufferBacking::FromImage { .. } => TextureDimension::D2,
+			StorageTextureBufferBacking::WithBacking(texture) => texture.dimension(),
+			StorageTextureBufferBacking::New { dimensions, .. } => {
+				dimensions.get_dimension().compatible_texture_dimension()
+			}
+			StorageTextureBufferBacking::FromImage { .. } => TextureDimension::D2,
 		}
 	}
 
 	fn get_view_dimension(&self) -> TextureViewDimension {
 		match &self.backing {
-			TextureBufferBacking::WithBacking(texture) => texture.view_dimension(),
-			TextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
-			TextureBufferBacking::FromImage { .. } => TextureViewDimension::D2,
+			StorageTextureBufferBacking::WithBacking(texture) => texture.view_dimension(),
+			StorageTextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
+			StorageTextureBufferBacking::FromImage { .. } => TextureViewDimension::D2,
 		}
 	}
 
 	fn get_format(&self) -> TextureFormat {
 		match &self.backing {
-			TextureBufferBacking::WithBacking(texture) => texture.format(),
-			TextureBufferBacking::New { format, .. } => *format,
-			TextureBufferBacking::FromImage { format, .. } => *format,
+			StorageTextureBufferBacking::WithBacking(texture) => texture.format(),
+			StorageTextureBufferBacking::New { format, .. } => *format,
+			StorageTextureBufferBacking::FromImage { format, .. } => *format,
 		}
 	}
 }
 
-impl ShaderBufferDescriptor for TextureBuffer<'_> {
+impl ShaderBufferDescriptor for StorageTextureBuffer<'_> {
 	fn label(&self, label_type: &str) -> String {
 		format!("TextureBuffer \"{}\" {}", self.var_name, label_type)
 	}
@@ -114,7 +120,7 @@ impl ShaderBufferDescriptor for TextureBuffer<'_> {
 	}
 }
 
-impl TextureBufferDescriptor for TextureBuffer<'_> {
+impl TextureBufferDescriptor for StorageTextureBuffer<'_> {
 	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup {
 		gpu.device.create_bind_group(&BindGroupDescriptor {
 			label: Some(&self.label("Bind Group")),
@@ -128,9 +134,9 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 
 	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex> {
 		match &self.backing {
-			TextureBufferBacking::WithBacking(texture) => texture.clone(),
+			StorageTextureBufferBacking::WithBacking(texture) => texture.clone(),
 
-			TextureBufferBacking::New {
+			StorageTextureBufferBacking::New {
 				label,
 				dimensions,
 				format,
@@ -148,7 +154,7 @@ impl TextureBufferDescriptor for TextureBuffer<'_> {
 				None,
 			)),
 
-			TextureBufferBacking::FromImage {
+			StorageTextureBufferBacking::FromImage {
 				label,
 				image,
 				format,

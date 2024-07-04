@@ -118,7 +118,6 @@ impl SamplerEdges {
 
 #[derive(Debug)]
 pub struct Tex {
-	label: String,
 	view_dimension: TextureViewDimension,
 	aspect: TextureAspect,
 	pub texture: Texture,
@@ -181,10 +180,29 @@ impl Tex {
 	// 	)
 	// }
 
-	pub fn create(gpu: &Gpu, desc: TexDescriptor, sampler: Option<TexSamplerDescriptor>) -> Self {
-		let label = desc.label.to_owned();
+	pub fn create(gpu: &Gpu, mut desc: TexDescriptor, sampler_desc: Option<TexSamplerDescriptor>) -> Self {
 		let view_dimension = desc.dimensions.get_dimension();
 		let aspect = desc.aspect;
+		let mut sampler = None::<Sampler>;
+
+		if let Some(sampler_desc) = sampler_desc {
+			// If the texture is gonna be sampled, it needs to be bound with TEXTURE_BINDING
+			// anyway
+			desc.usage = desc.usage.map(|u| u | TextureUsages::TEXTURE_BINDING);
+
+			sampler = Some(gpu.device.create_sampler(&SamplerDescriptor {
+				label: Some(&format!("{} Sampler", desc.label)),
+				address_mode_u: sampler_desc.edges.as_address_mode(),
+				address_mode_v: sampler_desc.edges.as_address_mode(),
+				address_mode_w: sampler_desc.edges.as_address_mode(),
+				mag_filter: sampler_desc.filter,
+				min_filter: sampler_desc.filter,
+				mipmap_filter: sampler_desc.filter,
+				border_color: sampler_desc.edges.get_border_color(),
+				compare: sampler_desc.compare,
+				..Default::default()
+			}));
+		}
 
 		let texture = gpu.device.create_texture(&TextureDescriptor {
 			label: Some(&format!("{} Texture", desc.label)),
@@ -209,35 +227,13 @@ impl Tex {
 			..Default::default()
 		});
 
-		let mut tex = Self {
-			label,
+		Self {
 			view_dimension,
 			aspect,
 			texture,
 			view,
-			sampler: None,
-		};
-
-		if let Some(sampler_desc) = sampler {
-			tex.add_sampler(gpu, sampler_desc);
+			sampler,
 		}
-
-		tex
-	}
-
-	pub fn add_sampler(&mut self, gpu: &Gpu, mut sampler_desc: TexSamplerDescriptor) {
-		self.sampler = Some(gpu.device.create_sampler(&SamplerDescriptor {
-			label: Some(&format!("{} Sampler", self.label)),
-			address_mode_u: sampler_desc.edges.as_address_mode(),
-			address_mode_v: sampler_desc.edges.as_address_mode(),
-			address_mode_w: sampler_desc.edges.as_address_mode(),
-			mag_filter: sampler_desc.filter,
-			min_filter: sampler_desc.filter,
-			mipmap_filter: sampler_desc.filter,
-			border_color: sampler_desc.edges.get_border_color(),
-			compare: sampler_desc.compare,
-			..Default::default()
-		}));
 	}
 
 	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8]) {

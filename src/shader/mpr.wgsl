@@ -11,9 +11,12 @@ struct Object {
 	color: vec3f,
 }
 
-fn render_pixel(pixel_coord: vec2f, pixel_size: vec2f) -> vec4f {
-	let coord = (pixel_coord - pixel_size / 2.0) / pixel_size.y;
-	return render(coord);
+fn render_pixel(pixel_coord: vec2u, pixel_size: vec2u) {
+	let coord = (vec2f(pixel_coord) - vec2f(pixel_size) / 2.0) / f32(pixel_size.y);
+	
+	let color = render(coord);
+	
+	textureStore(output_color, pixel_coord, color);
 }
 
 fn render(coord: vec2f) -> vec4f {

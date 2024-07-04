@@ -20,7 +20,6 @@ use super::{
 	},
 	embed::Assets,
 	smart_arc::Sarc,
-	texture::Tex,
 };
 use crate::core::gpu::Gpu;
 
@@ -186,6 +185,7 @@ struct ShaderBuilderState<'a> {
 	pub shader_stages: ShaderStages,
 	pub blacklist: HashSet<Shader>,
 	pub bind_group_offset: u32,
+	pub binding_offset: u32,
 }
 
 impl<'a> ShaderBuilderState<'a> {
@@ -197,10 +197,11 @@ impl<'a> ShaderBuilderState<'a> {
 	) -> Self {
 		Self {
 			gpu,
-			blacklist: HashSet::new(),
-			shader_stages,
-			bind_group_offset,
 			shader_map: shader_map as &'a dyn Assets,
+			shader_stages,
+			blacklist: HashSet::new(),
+			bind_group_offset,
+			binding_offset: 0,
 		}
 	}
 }
@@ -281,8 +282,8 @@ impl Shader {
 				let source = data_buffer.binding_source_code(state.bind_group_offset, 0);
 
 				println!(
-					"DATA BUFFER | bind_group: {}, source: {}",
-					state.bind_group_offset, &source
+					"DATA BUFFER | bind_group: {}, binding: {}, source: {}",
+					state.bind_group_offset, state.binding_offset, &source
 				);
 
 				let buffer = GenericDataBuffer::new(state.gpu, state.shader_stages, data_buffer.as_ref());
@@ -297,8 +298,8 @@ impl Shader {
 				let source = texture_buffer.binding_source_code(state.bind_group_offset, 0);
 
 				println!(
-					"TEXTURE BUFFER | bind_group: {}, source: {}",
-					state.bind_group_offset, &source
+					"TEXTURE BUFFER | bind_group: {}, binding: {}, source: {}",
+					state.bind_group_offset, state.binding_offset, &source
 				);
 
 				let buffer = GenericTextureBuffer::new(state.gpu, state.shader_stages, texture_buffer.as_ref());

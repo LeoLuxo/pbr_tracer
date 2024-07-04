@@ -28,7 +28,7 @@ use crate::{
 	},
 	libs::{
 		buffer::{
-			self, texture_sampler_buffer::TextureSamplerBuffer, uniform_buffer::UniformBuffer, BufferMappingApplicable,
+			self, sampled_texture_buffer::SampledTextureBuffer, uniform_buffer::UniformBuffer, BufferMappingApplicable,
 			GenericDataBuffer, ShaderType,
 		},
 		shader::{CompiledShader, ShaderBuilder},
@@ -100,14 +100,18 @@ impl CompositeRenderer {
 		compute_renderer: &ComputeRenderer,
 		viewport_buffer: GenericDataBuffer,
 	) -> Self {
+		let output_texture = compute_renderer
+			.output_textures
+			.first()
+			.expect("Compute renderer needs at least 1 output texture")
+			.clone();
+
 		let shader = ShaderBuilder::new()
 			.include_path("composite.wgsl")
-			.include_texture(TextureSamplerBuffer::new(
+			.include_texture(SampledTextureBuffer::new(
 				"out_texture",
 				"out_sampler",
-				buffer::texture_sampler_buffer::TextureSamplerBufferBacking::WithBacking(
-					compute_renderer.output_texture.clone(),
-				),
+				buffer::sampled_texture_buffer::SampledTextureBufferBacking::WithBacking(output_texture),
 			))
 			.include_data_buffer(UniformBuffer::<Vec2<u32>>::from_buffer(
 				"viewport_size",

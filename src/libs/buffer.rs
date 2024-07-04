@@ -1,6 +1,6 @@
+pub mod sampled_texture_buffer;
 pub mod storage_buffer;
-pub mod texture_buffer;
-pub mod texture_sampler_buffer;
+pub mod storage_texture_buffer;
 pub mod uniform_buffer;
 
 use std::{collections::HashMap, mem};
@@ -100,8 +100,8 @@ pub trait DataBufferDescriptor: ShaderBufferDescriptor {
 }
 
 pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<TextureAsset>;
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &TextureAsset) -> BindGroup;
+	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex>;
+	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup;
 }
 
 /*
@@ -155,7 +155,7 @@ impl ShaderBuffer for GenericDataBuffer {
 #[derive(bevy::Component, Debug)]
 pub struct GenericTextureBuffer {
 	pub label: String,
-	pub texture: Sarc<TextureAsset>,
+	pub texture: Sarc<Tex>,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
 }
