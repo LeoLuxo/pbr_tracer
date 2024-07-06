@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
 use image::DynamicImage;
 use wgpu::{
-	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingResource, BindingType, ShaderStages, StorageTextureAccess, TextureAspect, TextureDimension, TextureFormat,
+	BindingResource, BindingType, Features, StorageTextureAccess, TextureAspect, TextureDimension, TextureFormat,
 	TextureUsages, TextureViewDimension,
 };
 
-use super::{ShaderBufferDescriptor, TextureBufferDescriptor};
+use super::{ShaderBufferDescriptor, ShaderBufferResource};
 use crate::{
 	core::gpu::Gpu,
 	libs::{
+		buffer::PartialLayoutEntry,
 		smart_arc::Sarc,
 		texture::{self, Tex, TexDescriptor, TextureAssetDimensions},
 	},
@@ -20,146 +22,148 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct StorageTextureBuffer<'a> {
-	pub var_name: String,
-	pub access: StorageTextureAccess,
-	pub backing: StorageTextureBufferBacking<'a>,
-}
-
-pub enum StorageTextureBufferBacking<'a> {
-	WithBacking(Sarc<Tex>),
+pub enum StorageTexture<S: Into<String> + Clone> {
 	New {
-		label: &'a str,
+		var_name: S,
+		access: StorageTextureAccess,
 		dimensions: TextureAssetDimensions,
 		format: TextureFormat,
 		usage: Option<TextureUsages>,
 		aspect: TextureAspect,
 	},
 	FromImage {
-		label: &'a str,
+		var_name: S,
+		access: StorageTextureAccess,
 		image: DynamicImage,
 		format: TextureFormat,
 		usage: Option<TextureUsages>,
 	},
-}
-
-impl<'a> StorageTextureBuffer<'a> {
-	pub fn new(
-		var_name: impl Into<String>,
+	FromTex {
+		var_name: S,
 		access: StorageTextureAccess,
-		backing: StorageTextureBufferBacking<'a>,
-	) -> Self {
-		Self {
-			var_name: var_name.into(),
-			access,
-			backing,
-		}
-	}
-
-	fn get_dimension(&self) -> TextureDimension {
-		match &self.backing {
-			StorageTextureBufferBacking::WithBacking(texture) => texture.dimension(),
-			StorageTextureBufferBacking::New { dimensions, .. } => {
-				dimensions.get_dimension().compatible_texture_dimension()
-			}
-			StorageTextureBufferBacking::FromImage { .. } => TextureDimension::D2,
-		}
-	}
-
-	fn get_view_dimension(&self) -> TextureViewDimension {
-		match &self.backing {
-			StorageTextureBufferBacking::WithBacking(texture) => texture.view_dimension(),
-			StorageTextureBufferBacking::New { dimensions, .. } => dimensions.get_dimension(),
-			StorageTextureBufferBacking::FromImage { .. } => TextureViewDimension::D2,
-		}
-	}
-
-	fn get_format(&self) -> TextureFormat {
-		match &self.backing {
-			StorageTextureBufferBacking::WithBacking(texture) => texture.format(),
-			StorageTextureBufferBacking::New { format, .. } => *format,
-			StorageTextureBufferBacking::FromImage { format, .. } => *format,
-		}
-	}
+		tex: Sarc<Tex>,
+	},
 }
 
-impl ShaderBufferDescriptor for StorageTextureBuffer<'_> {
-	fn label(&self, label_type: &str) -> String {
-		format!("TextureBuffer \"{}\" {}", self.var_name, label_type)
-	}
-
-	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String {
-		let dimension = texture::dimension_to_string(self.get_dimension());
-		let format = texture::format_to_string(self.get_format());
-		let access = texture::access_to_string(self.access);
-
-		format!(
-			"@group({}) @binding({}) var {}: texture_storage_{}<{}, {}>;",
-			group, binding_offset, self.var_name, dimension, format, access
-		)
-	}
-
-	fn other_source_code(&self) -> Option<String> {
-		None
-	}
-
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout {
-		gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-			label: Some(&self.label("Bind Group Layout")),
-			entries: &[BindGroupLayoutEntry {
-				binding: 0,
-				visibility,
-				ty: BindingType::StorageTexture {
-					access: self.access,
-					format: self.get_format(),
-					view_dimension: self.get_view_dimension(),
-				},
-				count: None,
-			}],
-		})
-	}
-}
-
-impl TextureBufferDescriptor for StorageTextureBuffer<'_> {
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup {
-		gpu.device.create_bind_group(&BindGroupDescriptor {
-			label: Some(&self.label("Bind Group")),
-			layout,
-			entries: &[BindGroupEntry {
-				binding: 0,
-				resource: BindingResource::TextureView(&texture.view),
-			}],
-		})
-	}
-
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex> {
-		match &self.backing {
-			StorageTextureBufferBacking::WithBacking(texture) => texture.clone(),
-
-			StorageTextureBufferBacking::New {
-				label,
+impl<S: Into<String> + Clone> ShaderBufferDescriptor for StorageTexture<S> {
+	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource> {
+		let resource = match self {
+			StorageTexture::New {
+				var_name,
+				access,
 				dimensions,
 				format,
 				usage,
 				aspect,
-			} => Sarc::new(Tex::create(
-				gpu,
-				TexDescriptor {
-					label,
-					dimensions: *dimensions,
-					format: *format,
-					usage: *usage,
-					aspect: *aspect,
-				},
-				None,
-			)),
+			} => {
+				let var_name = var_name.to_owned().into();
 
-			StorageTextureBufferBacking::FromImage {
-				label,
+				let tex = Sarc::new(Tex::create(
+					gpu,
+					TexDescriptor {
+						label: &format!("StorageTexture '{}'", var_name),
+						dimensions: *dimensions,
+						format: *format,
+						usage: *usage,
+						aspect: *aspect,
+					},
+					None,
+				));
+
+				StorageTextureResource {
+					tex,
+					var_name,
+					access: *access,
+					dimension: dimensions.get_dimension().compatible_texture_dimension(),
+					view_dimension: dimensions.get_dimension(),
+					format: *format,
+				}
+			}
+
+			StorageTexture::FromImage {
+				var_name,
+				access,
 				image,
 				format,
 				usage,
-			} => Sarc::new(Tex::from_image(gpu, label, image, *format, *usage, None)),
-		}
+			} => {
+				let var_name = var_name.to_owned().into();
+				let tex = Sarc::new(Tex::from_image(
+					gpu,
+					&format!("StorageTexture '{}'", var_name),
+					image,
+					*format,
+					*usage,
+					None,
+				));
+
+				StorageTextureResource {
+					tex,
+					var_name,
+					access: *access,
+					dimension: TextureDimension::D2,
+					view_dimension: TextureViewDimension::D2,
+					format: *format,
+				}
+			}
+
+			StorageTexture::FromTex { var_name, access, tex } => StorageTextureResource {
+				tex: tex.clone(),
+				var_name: var_name.to_owned().into(),
+				access: *access,
+				dimension: tex.dimension(),
+				view_dimension: tex.view_dimension(),
+				format: tex.format(),
+			},
+		};
+
+		Sarc(Arc::new(resource) as Arc<dyn ShaderBufferResource>)
+	}
+}
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+pub struct StorageTextureResource {
+	pub tex: Sarc<Tex>,
+	pub var_name: String,
+	pub access: StorageTextureAccess,
+	pub dimension: TextureDimension,
+	pub view_dimension: TextureViewDimension,
+	pub format: TextureFormat,
+}
+
+impl ShaderBufferResource for StorageTextureResource {
+	fn binding_source_code(&self, group: u32, binding: u32) -> Vec<String> {
+		let dimension = texture::dimension_to_string(self.dimension);
+		let format = texture::format_to_string(self.format);
+		let access = texture::access_to_string(self.access);
+
+		vec![format!(
+			"@group({}) @binding({}) var {}: texture_storage_{}<{}, {}>;",
+			group, binding, self.var_name, dimension, format, access
+		)]
+	}
+
+	fn other_source_code(&self) -> Option<&str> {
+		None
+	}
+
+	fn layouts(&self, _features: Features) -> Vec<PartialLayoutEntry> {
+		vec![PartialLayoutEntry {
+			ty: BindingType::StorageTexture {
+				access: self.access,
+				format: self.format,
+				view_dimension: self.view_dimension,
+			},
+			count: None,
+		}]
+	}
+
+	fn binding_resources(&self) -> Vec<BindingResource> {
+		vec![BindingResource::TextureView(&self.tex.view)]
 	}
 }

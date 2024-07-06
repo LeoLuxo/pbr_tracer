@@ -1,10 +1,11 @@
+use std::sync::Arc;
+
 use wgpu::{
 	util::{BufferInitDescriptor, DeviceExt},
-	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ShaderStages,
+	BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Features,
 };
 
-use super::{DataBufferDescriptor, DataBufferUploadable, ShaderBufferDescriptor};
+use super::{DataBufferUploadable, PartialLayoutEntry, ShaderBufferDescriptor, ShaderBufferResource};
 use crate::{
 	core::gpu::Gpu,
 	libs::{buffer::ShaderType, smart_arc::Sarc},
@@ -16,124 +17,148 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct StorageBuffer<T: DataBufferUploadable + ShaderType> {
+pub enum StorageBuffer<T, S>
+where
+	T: DataBufferUploadable + ShaderType,
+	S: Into<String> + Clone,
+{
+	New {
+		var_name: S,
+		read_only: bool,
+		size: u64,
+	},
+	FromData {
+		var_name: S,
+		read_only: bool,
+		data: T,
+	},
+	FromBuffer {
+		var_name: S,
+		read_only: bool,
+		buffer: Sarc<Buffer>,
+	},
+}
+
+impl<T, S> ShaderBufferDescriptor for StorageBuffer<T, S>
+where
+	T: DataBufferUploadable + ShaderType,
+	S: Into<String> + Clone,
+{
+	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource> {
+		let type_name = <T as ShaderType>::type_name();
+		let struct_definition = <T as ShaderType>::struct_definition();
+
+		let resource = match self {
+			StorageBuffer::New {
+				var_name,
+				read_only,
+				size,
+			} => {
+				let var_name = var_name.to_owned().into();
+				let buffer = Sarc::new(gpu.device.create_buffer(&BufferDescriptor {
+					label: Some(&format!("StorageBuffer<{}> '{}'", type_name, var_name)),
+					size: *size,
+					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+					mapped_at_creation: false,
+				}));
+
+				StorageBufferResource {
+					buffer,
+					var_name,
+					read_only: *read_only,
+					type_name,
+					struct_definition,
+				}
+			}
+
+			StorageBuffer::FromData {
+				var_name,
+				read_only,
+				data,
+			} => {
+				let var_name = var_name.to_owned().into();
+				let buffer = Sarc::new(gpu.device.create_buffer_init(&BufferInitDescriptor {
+					label: Some(&format!("StorageBuffer<{}> '{}'", type_name, var_name)),
+					contents: &data.get_bytes(),
+					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+				}));
+
+				StorageBufferResource {
+					buffer,
+					var_name,
+					read_only: *read_only,
+					type_name,
+					struct_definition,
+				}
+			}
+
+			StorageBuffer::FromBuffer {
+				var_name,
+				read_only,
+				buffer,
+			} => StorageBufferResource {
+				buffer: buffer.clone(),
+				var_name: var_name.to_owned().into(),
+				read_only: *read_only,
+				type_name,
+				struct_definition,
+			},
+		};
+
+		Sarc(Arc::new(resource) as Arc<dyn ShaderBufferResource>)
+	}
+}
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+pub struct StorageBufferResource {
+	pub buffer: Sarc<Buffer>,
 	pub var_name: String,
 	pub read_only: bool,
-	pub backing: StorageBufferBacking<T>,
+	pub type_name: String,
+	pub struct_definition: Option<String>,
 }
 
-pub enum StorageBufferBacking<T: DataBufferUploadable + ShaderType> {
-	NewSized(u64),
-	FromData(T),
-	FromBuffer(Sarc<Buffer>),
-}
-
-impl<T: DataBufferUploadable + ShaderType> StorageBuffer<T> {
-	pub fn new(var_name: impl Into<String>, size: u64, read_only: bool) -> Self {
-		Self {
-			var_name: var_name.into(),
-			read_only,
-			backing: StorageBufferBacking::NewSized(size),
-		}
-	}
-
-	pub fn from_data(var_name: impl Into<String>, data: T, read_only: bool) -> Self {
-		Self {
-			var_name: var_name.into(),
-			read_only,
-			backing: StorageBufferBacking::FromData(data),
-		}
-	}
-
-	pub fn from_buffer(var_name: impl Into<String>, buffer: Sarc<Buffer>, read_only: bool) -> Self {
-		Self {
-			var_name: var_name.into(),
-			read_only,
-			backing: StorageBufferBacking::FromBuffer(buffer),
-		}
+impl StorageBufferResource {
+	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress) {
+		gpu.queue.write_buffer(&self.buffer, offset, bytes)
 	}
 }
 
-impl<T: DataBufferUploadable + ShaderType> ShaderBufferDescriptor for StorageBuffer<T> {
-	fn label(&self, label_type: &str) -> String {
-		format!(
-			"StorageBuffer<{}> \"{}\" {}",
-			<T as ShaderType>::type_name(),
-			self.var_name,
-			label_type
-		)
-	}
-
-	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String {
-		format!(
+impl ShaderBufferResource for StorageBufferResource {
+	fn binding_source_code(&self, group: u32, binding_offset: u32) -> Vec<String> {
+		vec![format!(
 			"@group({}) @binding({}) var<storage, {}> {}: {};",
 			group,
 			binding_offset,
 			if self.read_only { "read" } else { "read_write" },
 			self.var_name,
-			<T as ShaderType>::type_name()
-		)
+			self.type_name
+		)]
 	}
 
-	fn other_source_code(&self) -> Option<String> {
-		<T as ShaderType>::struct_definition()
+	fn other_source_code(&self) -> Option<&str> {
+		self.struct_definition.as_deref()
 	}
 
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout {
-		gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-			label: Some(&self.label("Bind Group Layout")),
-			entries: &[BindGroupLayoutEntry {
-				binding: 0,
-				visibility,
-				ty: BindingType::Buffer {
-					ty: BufferBindingType::Storage {
-						read_only: self.read_only,
-					},
-					has_dynamic_offset: false,
-					min_binding_size: None,
+	fn layouts(&self, _features: Features) -> Vec<PartialLayoutEntry> {
+		vec![PartialLayoutEntry {
+			ty: BindingType::Buffer {
+				ty: BufferBindingType::Storage {
+					read_only: self.read_only,
 				},
-				count: None,
-			}],
-		})
-	}
-}
-
-impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for StorageBuffer<T> {
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
-		gpu.device.create_bind_group(&BindGroupDescriptor {
-			label: Some(&self.label("Bind Group")),
-			layout,
-			entries: &[BindGroupEntry {
-				binding: 0,
-				resource: buffer.as_entire_binding(),
-			}],
-		})
+				has_dynamic_offset: false,
+				min_binding_size: None,
+			},
+			count: None,
+		}]
 	}
 
-	fn create_buffer(&self, gpu: &Gpu) -> Sarc<Buffer> {
-		match &self.backing {
-			StorageBufferBacking::NewSized(size) => {
-				let buffer = gpu.device.create_buffer(&BufferDescriptor {
-					label: Some(&self.label("Buffer")),
-					size: *size,
-					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-					mapped_at_creation: false,
-				});
-
-				Sarc::new(buffer)
-			}
-
-			StorageBufferBacking::FromData(data) => {
-				let buffer = gpu.device.create_buffer_init(&BufferInitDescriptor {
-					label: Some(&self.label("Buffer")),
-					contents: &data.get_bytes(),
-					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-				});
-
-				Sarc::new(buffer)
-			}
-
-			StorageBufferBacking::FromBuffer(buffer) => buffer.clone(),
-		}
+	fn binding_resources(&self) -> Vec<BindingResource> {
+		vec![self.buffer.as_entire_binding()]
 	}
 }

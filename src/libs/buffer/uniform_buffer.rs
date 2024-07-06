@@ -1,10 +1,11 @@
+use std::sync::Arc;
+
 use wgpu::{
 	util::{BufferInitDescriptor, DeviceExt},
-	BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-	BindingType, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ShaderStages,
+	BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Features,
 };
 
-use super::{DataBufferDescriptor, DataBufferUploadable, ShaderBufferDescriptor};
+use super::{DataBufferUploadable, PartialLayoutEntry, ShaderBufferDescriptor, ShaderBufferResource};
 use crate::{
 	core::gpu::Gpu,
 	libs::{buffer::ShaderType, smart_arc::Sarc},
@@ -16,117 +17,114 @@ use crate::{
 --------------------------------------------------------------------------------
 */
 
-pub struct UniformBuffer<T: DataBufferUploadable + ShaderType> {
-	pub var_name: String,
-	pub backing: UniformBufferBacking<T>,
+pub enum UniformBuffer<T, S>
+where
+	T: DataBufferUploadable + ShaderType,
+	S: Into<String> + Clone,
+{
+	New { var_name: S, size: u64 },
+	FromData { var_name: S, data: T },
+	FromBuffer { var_name: S, buffer: Sarc<Buffer> },
 }
 
-pub enum UniformBufferBacking<T: DataBufferUploadable + ShaderType> {
-	NewSized(u64),
-	FromData(T),
-	FromBuffer(Sarc<Buffer>),
-}
+impl<T, S> ShaderBufferDescriptor for UniformBuffer<T, S>
+where
+	T: DataBufferUploadable + ShaderType,
+	S: Into<String> + Clone,
+{
+	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource> {
+		let type_name = <T as ShaderType>::type_name();
+		let struct_definition = <T as ShaderType>::struct_definition();
 
-impl<T: DataBufferUploadable + ShaderType> UniformBuffer<T> {
-	pub fn new(var_name: impl Into<String>, size: u64) -> Self {
-		Self {
-			var_name: var_name.into(),
-			backing: UniformBufferBacking::NewSized(size),
-		}
-	}
-
-	pub fn from_data(var_name: impl Into<String>, data: T) -> Self {
-		Self {
-			var_name: var_name.into(),
-			backing: UniformBufferBacking::FromData(data),
-		}
-	}
-
-	pub fn from_buffer(var_name: impl Into<String>, buffer: Sarc<Buffer>) -> Self {
-		Self {
-			var_name: var_name.into(),
-			backing: UniformBufferBacking::FromBuffer(buffer),
-		}
-	}
-}
-
-impl<T: DataBufferUploadable + ShaderType> ShaderBufferDescriptor for UniformBuffer<T> {
-	fn label(&self, label_type: &str) -> String {
-		format!(
-			"UniformBuffer<{}> \"{}\" {}",
-			<T as ShaderType>::type_name(),
-			self.var_name,
-			label_type
-		)
-	}
-
-	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String {
-		format!(
-			"@group({}) @binding({}) var<uniform> {}: {};",
-			group,
-			binding_offset,
-			self.var_name,
-			<T as ShaderType>::type_name()
-		)
-	}
-
-	fn other_source_code(&self) -> Option<String> {
-		<T as ShaderType>::struct_definition()
-	}
-
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout {
-		gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-			label: Some(&self.label("Bind Group Layout")),
-			entries: &[BindGroupLayoutEntry {
-				binding: 0,
-				visibility,
-				ty: BindingType::Buffer {
-					ty: BufferBindingType::Uniform,
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			}],
-		})
-	}
-}
-
-impl<T: DataBufferUploadable + ShaderType> DataBufferDescriptor for UniformBuffer<T> {
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
-		gpu.device.create_bind_group(&BindGroupDescriptor {
-			label: Some(&self.label("Bind Group")),
-			layout,
-			entries: &[BindGroupEntry {
-				binding: 0,
-				resource: buffer.as_entire_binding(),
-			}],
-		})
-	}
-
-	fn create_buffer(&self, gpu: &Gpu) -> Sarc<Buffer> {
-		match &self.backing {
-			UniformBufferBacking::NewSized(size) => {
-				let buffer = gpu.device.create_buffer(&BufferDescriptor {
-					label: Some(&self.label("Buffer")),
+		let resource = match self {
+			UniformBuffer::New { var_name, size } => {
+				let var_name = var_name.to_owned().into();
+				let buffer = Sarc::new(gpu.device.create_buffer(&BufferDescriptor {
+					label: Some(&format!("UniformBuffer<{}> '{}'", type_name, &var_name)),
 					size: *size,
 					usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
 					mapped_at_creation: false,
-				});
+				}));
 
-				Sarc::new(buffer)
+				UniformBufferResource {
+					buffer,
+					var_name,
+					type_name,
+					struct_definition,
+				}
 			}
 
-			UniformBufferBacking::FromData(data) => {
-				let buffer = gpu.device.create_buffer_init(&BufferInitDescriptor {
-					label: Some(&self.label("Buffer")),
+			UniformBuffer::FromData { var_name, data } => {
+				let var_name = var_name.to_owned().into();
+				let buffer = Sarc::new(gpu.device.create_buffer_init(&BufferInitDescriptor {
+					label: Some(&format!("UniformBuffer<{}> '{}'", type_name, var_name)),
 					contents: &data.get_bytes(),
 					usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-				});
+				}));
 
-				Sarc::new(buffer)
+				UniformBufferResource {
+					buffer,
+					var_name,
+					type_name,
+					struct_definition,
+				}
 			}
 
-			UniformBufferBacking::FromBuffer(buffer) => buffer.clone(),
-		}
+			UniformBuffer::FromBuffer { var_name, buffer } => UniformBufferResource {
+				buffer: buffer.clone(),
+				var_name: var_name.to_owned().into(),
+				type_name,
+				struct_definition,
+			},
+		};
+
+		Sarc(Arc::new(resource) as Arc<dyn ShaderBufferResource>)
+	}
+}
+
+/*
+--------------------------------------------------------------------------------
+||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+--------------------------------------------------------------------------------
+*/
+
+pub struct UniformBufferResource {
+	pub buffer: Sarc<Buffer>,
+	pub var_name: String,
+	pub type_name: String,
+	pub struct_definition: Option<String>,
+}
+
+impl UniformBufferResource {
+	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress) {
+		gpu.queue.write_buffer(&self.buffer, offset, bytes)
+	}
+}
+
+impl ShaderBufferResource for UniformBufferResource {
+	fn binding_source_code(&self, group: u32, binding: u32) -> Vec<String> {
+		vec![format!(
+			"@group({}) @binding({}) var<uniform> {}: {};",
+			group, binding, self.var_name, self.type_name
+		)]
+	}
+
+	fn other_source_code(&self) -> Option<&str> {
+		self.struct_definition.as_deref()
+	}
+
+	fn layouts(&self, _features: Features) -> Vec<PartialLayoutEntry> {
+		vec![PartialLayoutEntry {
+			ty: BindingType::Buffer {
+				ty: BufferBindingType::Uniform,
+				has_dynamic_offset: false,
+				min_binding_size: None,
+			},
+			count: None,
+		}]
+	}
+
+	fn binding_resources(&self) -> Vec<BindingResource> {
+		vec![self.buffer.as_entire_binding()]
 	}
 }

@@ -3,17 +3,16 @@ pub mod storage_buffer;
 pub mod storage_texture_buffer;
 pub mod uniform_buffer;
 
-use std::{collections::HashMap, mem};
+use std::{fmt::Debug, mem, num::NonZero};
 
-use bevy_ecs::system::{Query, Res};
-use brainrot::{
-	bevy::{self, App},
-	vek::{self},
+use brainrot::vek::{self};
+use wgpu::{
+	BindGroup, BindGroupLayout, BindGroupLayoutEntry, BindingResource, BindingType, ComputePass, Features, RenderPass,
+	ShaderStages,
 };
-use wgpu::{BindGroup, BindGroupLayout, Buffer, BufferAddress, ComputePass, RenderPass, ShaderStages};
 
-use super::{smart_arc::Sarc, texture::Tex};
-use crate::core::{gameloop::PreRender, gpu::Gpu};
+use super::smart_arc::Sarc;
+use crate::core::gpu::Gpu;
 
 /*
 --------------------------------------------------------------------------------
@@ -81,28 +80,38 @@ impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> DataBufferUploadab
 --------------------------------------------------------------------------------
 */
 
-pub trait ShaderBuffer {
-	fn label(&self) -> &str;
-	fn bind_group_layout(&self) -> &BindGroupLayout;
-	fn bind_group(&self) -> &BindGroup;
+pub struct PartialLayoutEntry {
+	pub ty: BindingType,
+	pub count: Option<NonZero<u32>>,
+}
+
+impl PartialLayoutEntry {
+	pub fn into_layout_entry(self, binding: u32, visibility: ShaderStages) -> BindGroupLayoutEntry {
+		BindGroupLayoutEntry {
+			binding,
+			visibility,
+			ty: self.ty,
+			count: self.count,
+		}
+	}
 }
 
 pub trait ShaderBufferDescriptor {
-	fn label(&self, label_type: &str) -> String;
-	fn binding_source_code(&self, group: u32, binding_offset: u32) -> String;
-	fn other_source_code(&self) -> Option<String>;
-	fn create_bind_group_layout(&self, gpu: &Gpu, visibility: ShaderStages) -> BindGroupLayout;
+	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource>;
 }
 
-pub trait DataBufferDescriptor: ShaderBufferDescriptor {
-	fn create_buffer(&self, gpu: &Gpu) -> Sarc<Buffer>;
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, buffer: &Buffer) -> BindGroup;
+pub trait ShaderBufferResource {
+	fn binding_source_code(&self, group: u32, binding: u32) -> Vec<String>;
+	fn other_source_code(&self) -> Option<&str>;
+	fn layouts(&self, features: Features) -> Vec<PartialLayoutEntry>;
+	fn binding_resources(&self) -> Vec<BindingResource>;
 }
 
-pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
-	fn create_texture(&self, gpu: &Gpu) -> Sarc<Tex>;
-	fn create_bind_group(&self, gpu: &Gpu, layout: &BindGroupLayout, texture: &Tex) -> BindGroup;
-}
+// pub trait ShaderBuffer {
+// 	fn label(&self) -> &str;
+// 	fn bind_group_layout(&self) -> &BindGroupLayout;
+// 	fn bind_group(&self) -> &BindGroup;
+// }
 
 /*
 --------------------------------------------------------------------------------
@@ -110,132 +119,33 @@ pub trait TextureBufferDescriptor: ShaderBufferDescriptor {
 --------------------------------------------------------------------------------
 */
 
-#[derive(bevy::Component, Clone, Debug, PartialEq, Eq)]
-pub struct GenericDataBuffer {
-	pub label: String,
-	pub buffer: Sarc<Buffer>,
-	pub bind_group_layout: Sarc<BindGroupLayout>,
-	pub bind_group: Sarc<BindGroup>,
-}
-
-impl GenericDataBuffer {
-	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn DataBufferDescriptor) -> Self {
-		let label = shader_buffer.label("(as GenericDataBuffer)");
-		let buffer = shader_buffer.create_buffer(gpu);
-		let bind_group_layout = Sarc::new(shader_buffer.create_bind_group_layout(gpu, visibility));
-		let bind_group = Sarc::new(shader_buffer.create_bind_group(gpu, &bind_group_layout, &buffer));
-
-		GenericDataBuffer {
-			label,
-			buffer,
-			bind_group_layout,
-			bind_group,
-		}
-	}
-
-	fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress) {
-		gpu.queue.write_buffer(&self.buffer, offset, bytes)
-	}
-}
-
-impl ShaderBuffer for GenericDataBuffer {
-	fn label(&self) -> &str {
-		&self.label
-	}
-
-	fn bind_group_layout(&self) -> &BindGroupLayout {
-		&self.bind_group_layout
-	}
-
-	fn bind_group(&self) -> &BindGroup {
-		&self.bind_group
-	}
-}
-
-#[derive(bevy::Component, Debug)]
-pub struct GenericTextureBuffer {
-	pub label: String,
-	pub texture: Sarc<Tex>,
+pub struct ShaderBufferBindGroup {
+	pub index: u32,
 	pub bind_group_layout: BindGroupLayout,
 	pub bind_group: BindGroup,
 }
 
-impl GenericTextureBuffer {
-	pub fn new(gpu: &Gpu, visibility: ShaderStages, shader_buffer: &dyn TextureBufferDescriptor) -> Self {
-		let label = shader_buffer.label("(as GenericTextureBuffer)");
-		let texture = shader_buffer.create_texture(gpu);
-		let bind_group_layout = shader_buffer.create_bind_group_layout(gpu, visibility);
-		let bind_group = shader_buffer.create_bind_group(gpu, &bind_group_layout, &texture);
-
-		GenericTextureBuffer {
-			label,
-			texture,
-			bind_group_layout,
-			bind_group,
-		}
-	}
-}
-
-impl ShaderBuffer for GenericTextureBuffer {
-	fn label(&self) -> &str {
-		&self.label
-	}
-
-	fn bind_group_layout(&self) -> &BindGroupLayout {
-		&self.bind_group_layout
-	}
-
-	fn bind_group(&self) -> &BindGroup {
-		&self.bind_group
-	}
-}
-
-/*
---------------------------------------------------------------------------------
-||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
---------------------------------------------------------------------------------
-*/
-
-#[derive(Default)]
-pub struct BufferMapping(pub HashMap<u32, Sarc<dyn ShaderBuffer + Sync + Send>>);
-
-impl BufferMapping {
-	pub fn layouts(&self) -> Vec<&BindGroupLayout> {
-		let mut entries = self.0.iter().collect::<Vec<_>>();
-		entries.sort_by_key(|(i, _)| *i);
-		entries.iter().map(|(_, v)| v.bind_group_layout()).collect()
-	}
-}
-
-impl std::fmt::Debug for BufferMapping {
+impl Debug for ShaderBufferBindGroup {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let mut tuple = f.debug_tuple("BufferMapping");
-
-		for (index, shader_buffer) in &self.0 {
-			tuple.field(&(index, shader_buffer.label()));
-		}
-
-		tuple.finish()
+		f.debug_struct("ShaderBufferBindGroup")
+			.field("index", &self.index)
+			.finish()
 	}
 }
 
 pub trait BufferMappingApplicable<'a> {
-	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a BufferMapping);
+	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a ShaderBufferBindGroup);
 }
 
 impl<'a> BufferMappingApplicable<'a> for ComputePass<'a> {
-	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a BufferMapping) {
-		for (index, shader_buffer) in &buffer_mapping.0 {
-			self.set_bind_group(*index, shader_buffer.bind_group(), &[]);
-		}
+	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a ShaderBufferBindGroup) {
+		self.set_bind_group(buffer_mapping.index, &buffer_mapping.bind_group, &[]);
 	}
 }
 
 impl<'a> BufferMappingApplicable<'a> for RenderPass<'a> {
-	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a BufferMapping) {
-		for (index, shader_buffer) in &buffer_mapping.0 {
-			self.set_bind_group(*index, shader_buffer.bind_group(), &[]);
-		}
+	fn apply_buffer_mapping(&mut self, buffer_mapping: &'a ShaderBufferBindGroup) {
+		self.set_bind_group(buffer_mapping.index, &buffer_mapping.bind_group, &[]);
 	}
 }
 
@@ -245,18 +155,18 @@ impl<'a> BufferMappingApplicable<'a> for RenderPass<'a> {
 --------------------------------------------------------------------------------
 */
 
-pub fn register_uniform_auto_update<T>(app: &mut App)
-where
-	T: DataBufferUploadable + bevy::Component + Send + Sync,
-{
-	app.add_systems(PreRender, upload_buffers_system::<T>);
-}
+// pub fn register_uniform_auto_update<T>(app: &mut App)
+// where
+// 	T: DataBufferUploadable + bevy::Component + Send + Sync,
+// {
+// 	app.add_systems(PreRender, upload_buffers_system::<T>);
+// }
 
-fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &GenericDataBuffer)>)
-where
-	T: DataBufferUploadable + bevy::Component + Send + Sync,
-{
-	for (data, buffer) in q.iter() {
-		buffer.upload_bytes(&gpu, &data.get_bytes(), 0);
-	}
-}
+// fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &GenericDataBuffer)>)
+// where
+// 	T: DataBufferUploadable + bevy::Component + Send + Sync,
+// {
+// 	for (data, buffer) in q.iter() {
+// 		buffer.upload_bytes(&gpu, &data.get_bytes(), 0);
+// 	}
+// }

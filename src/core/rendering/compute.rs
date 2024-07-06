@@ -14,10 +14,7 @@ use wgpu::{
 use crate::{
 	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	libs::{
-		buffer::{
-			storage_texture_buffer::{StorageTextureBuffer, StorageTextureBufferBacking},
-			BufferMappingApplicable,
-		},
+		buffer::{storage_texture_buffer::StorageTexture, BufferMappingApplicable},
 		shader::{CompiledShader, ShaderBuilder},
 		shader_fragment::Renderer,
 		smart_arc::Sarc,
@@ -93,23 +90,23 @@ impl ComputeRenderer {
 
 		// Add the output textures to the shader
 		for (var_name, tex) in &output_textures {
-			shader.include_texture(StorageTextureBuffer::new(
-				var_name,
-				StorageTextureAccess::ReadWrite,
-				StorageTextureBufferBacking::WithBacking(tex.clone()),
-			));
+			shader.include_buffer(StorageTexture::FromTex {
+				var_name: var_name.clone(),
+				access: StorageTextureAccess::ReadWrite,
+				tex: tex.clone(),
+			});
 		}
 
 		let output_textures = output_textures.into_iter().map(|(_, tex)| tex).collect::<Vec<_>>();
 
 		// Compile the shader
 		let shader = shader
-			.build(gpu, &ShaderAssets, ShaderStages::COMPUTE, 0)
+			.build(gpu, "Compute shader", &ShaderAssets, ShaderStages::COMPUTE, 0)
 			.expect("Couldn't build shader");
 
 		let pipeline_layout = gpu.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: Some("Compute Pipeline Layout"),
-			bind_group_layouts: &shader.buffers.layouts(),
+			bind_group_layouts: &shader.layouts(),
 			push_constant_ranges: &[],
 		});
 
@@ -148,7 +145,7 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 
 		compute_pass.set_pipeline(&compute_renderer.pipeline);
 
-		compute_pass.apply_buffer_mapping(&compute_renderer.shader.buffers);
+		compute_pass.apply_buffer_mapping(&compute_renderer.shader.binding);
 
 		// TODO: Change workgroup size to 64
 		compute_pass.dispatch_workgroups(compute_renderer.resolution.w, compute_renderer.resolution.h, 1);

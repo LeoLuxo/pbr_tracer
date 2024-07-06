@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet, fmt::Display, hash::Hash, mem, ops::Range, sync::Arc};
+use std::{borrow::Cow, collections::HashSet, hash::Hash, mem, ops::Range, sync::Arc};
 
 use anyhow::{anyhow, Ok, Result};
 use brainrot::{path, root, rooted_path};
@@ -10,13 +10,16 @@ use typed_path::{
 	TypedPath, TypedPathBuf, UnixPath, UnixPathBuf, Utf8TypedPath, Utf8TypedPathBuf, Utf8UnixPath, Utf8UnixPathBuf,
 	Utf8WindowsPath, Utf8WindowsPathBuf, WindowsPath, WindowsPathBuf,
 };
-use velcro::{hash_map, iter};
-use wgpu::{Device, ShaderModule, ShaderModuleDescriptor, ShaderStages};
+use velcro::iter;
+use wgpu::{
+	BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, ShaderModule,
+	ShaderModuleDescriptor, ShaderStages,
+};
 
 use super::{
 	buffer::{
-		uniform_buffer::UniformBuffer, BufferMapping, DataBufferDescriptor, DataBufferUploadable, GenericDataBuffer,
-		GenericTextureBuffer, ShaderBuffer, ShaderType, TextureBufferDescriptor,
+		uniform_buffer::UniformBuffer, DataBufferUploadable, ShaderBufferBindGroup, ShaderBufferDescriptor,
+		ShaderBufferResource, ShaderType,
 	},
 	embed::Assets,
 	smart_arc::Sarc,
@@ -28,7 +31,6 @@ use crate::core::gpu::Gpu;
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
-
 #[derive(Clone, Debug, Default, Hash, Eq, PartialEq)]
 pub struct ShaderBuilder {
 	include_directives: LinkedHashSet<Shader>,
@@ -49,31 +51,24 @@ impl ShaderBuilder {
 		self.include(path.into())
 	}
 
-	pub fn include_data_buffer(&mut self, data_buffer: impl DataBufferDescriptor + 'static) -> &mut Self {
-		if let Some(other_source_code) = data_buffer.other_source_code() {
-			self.include(Shader::Source(other_source_code));
-		}
+	pub fn include_buffer(&mut self, buffer: impl ShaderBufferDescriptor + 'static) -> &mut Self {
+		self.include(Shader::Buffer(
+			Sarc(Arc::new(buffer) as Arc<dyn ShaderBufferDescriptor>),
+		))
+	}
 
-		self.include(Shader::DataBuffer(Sarc(
-			Arc::new(data_buffer) as Arc<dyn DataBufferDescriptor>
+	pub fn include_buffer_resource(&mut self, buffer_resource: impl ShaderBufferResource + 'static) -> &mut Self {
+		self.include(Shader::BufferResource(Sarc(
+			Arc::new(buffer_resource) as Arc<dyn ShaderBufferResource>
 		)))
 	}
 
-	pub fn include_texture(&mut self, texture_buffer: impl TextureBufferDescriptor + 'static) -> &mut Self {
-		if let Some(other_source_code) = texture_buffer.other_source_code() {
-			self.include(Shader::Source(other_source_code));
-		}
-
-		self.include(Shader::TextureBuffer(Sarc(
-			Arc::new(texture_buffer) as Arc<dyn TextureBufferDescriptor>
-		)))
-	}
-
-	pub fn include_value<T>(&mut self, var_name: impl Into<String>, value: T) -> &mut Self
+	pub fn include_value<T, S>(&mut self, var_name: S, value: T) -> &mut Self
 	where
 		T: DataBufferUploadable + ShaderType + 'static,
+		S: Into<String> + Clone + 'static,
 	{
-		self.include_data_buffer(UniformBuffer::from_data(var_name, value))
+		self.include_buffer(UniformBuffer::FromData { var_name, data: value })
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -88,27 +83,22 @@ impl ShaderBuilder {
 	pub fn build<T: Assets>(
 		&mut self,
 		gpu: &Gpu,
+		label: impl Into<String>,
 		shader_map: &T,
 		shader_stages: ShaderStages,
-		bind_group_offset: u32,
+		bind_group_index: u32,
 	) -> Result<CompiledShader> {
-		let shader_source = self.build_source(gpu, shader_map, shader_stages, bind_group_offset)?;
+		let shader_source = self.build_source(gpu, shader_map)?;
 
-		let compiled_shader = shader_source.build(&gpu.device);
+		let compiled_shader = shader_source.build(gpu, label.into(), bind_group_index, shader_stages);
 
 		println!("{:#?}", compiled_shader);
 
 		Ok(compiled_shader)
 	}
 
-	pub fn build_source<T: Assets>(
-		&mut self,
-		gpu: &Gpu,
-		shader_map: &T,
-		shader_stages: ShaderStages,
-		bind_group_offset: u32,
-	) -> Result<ShaderSource> {
-		let mut state = ShaderBuilderState::new(gpu, shader_map, shader_stages, bind_group_offset);
+	pub fn build_source<T: Assets>(&mut self, gpu: &Gpu, shader_map: &T) -> Result<ShaderSource> {
+		let mut state = ShaderBuilderState::new(gpu, shader_map);
 		self.build_source_from_state(&mut state)
 	}
 
@@ -178,30 +168,18 @@ impl ShaderBuilder {
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
-
 struct ShaderBuilderState<'a> {
 	pub gpu: &'a Gpu,
 	pub shader_map: &'a dyn Assets,
-	pub shader_stages: ShaderStages,
 	pub blacklist: HashSet<Shader>,
-	pub bind_group_offset: u32,
-	pub binding_offset: u32,
 }
 
 impl<'a> ShaderBuilderState<'a> {
-	pub fn new<T: Assets>(
-		gpu: &'a Gpu,
-		shader_map: &'a T,
-		shader_stages: ShaderStages,
-		bind_group_offset: u32,
-	) -> Self {
+	pub fn new<T: Assets>(gpu: &'a Gpu, shader_map: &'a T) -> Self {
 		Self {
 			gpu,
 			shader_map: shader_map as &'a dyn Assets,
-			shader_stages,
 			blacklist: HashSet::new(),
-			bind_group_offset,
-			binding_offset: 0,
 		}
 	}
 }
@@ -211,14 +189,13 @@ impl<'a> ShaderBuilderState<'a> {
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
-
 #[derive(Hash, Debug, Clone, PartialEq, Eq)]
 pub enum Shader {
 	Source(String),
 	Path(Utf8UnixPathBuf),
 	Builder(ShaderBuilder),
-	DataBuffer(Sarc<dyn DataBufferDescriptor>),
-	TextureBuffer(Sarc<dyn TextureBufferDescriptor>),
+	Buffer(Sarc<dyn ShaderBufferDescriptor>),
+	BufferResource(Sarc<dyn ShaderBufferResource>),
 }
 
 impl Shader {
@@ -227,8 +204,8 @@ impl Shader {
 			Shader::Source(_) => root!(),
 			Shader::Path(path) => path.parent().map(|x| x.to_owned()).unwrap_or(root!()),
 			Shader::Builder(_) => root!(),
-			Shader::DataBuffer(_) => root!(),
-			Shader::TextureBuffer(_) => root!(),
+			Shader::Buffer(_) => root!(),
+			Shader::BufferResource(_) => root!(),
 		}
 	}
 
@@ -250,8 +227,8 @@ impl Shader {
 			// Add a define directive to the ShaderBuilder
 			Shader::Builder(mut builder) => builder.define(from, to).into(),
 			// Nothing to change in a uniform
-			Shader::DataBuffer(_) => self_,
-			Shader::TextureBuffer(_) => self_,
+			Shader::Buffer(_) => self_,
+			Shader::BufferResource(_) => self_,
 		});
 
 		obfuscated
@@ -278,37 +255,12 @@ impl Shader {
 
 			Shader::Builder(mut builder) => builder.build_source_from_state(state),
 
-			Shader::DataBuffer(data_buffer) => {
-				let source = data_buffer.binding_source_code(state.bind_group_offset, 0);
-
-				println!(
-					"DATA BUFFER | bind_group: {}, binding: {}, source: {}",
-					state.bind_group_offset, state.binding_offset, &source
-				);
-
-				let buffer = GenericDataBuffer::new(state.gpu, state.shader_stages, data_buffer.as_ref());
-				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
-
-				state.bind_group_offset += 1;
-
-				Ok(shader_source)
+			Shader::Buffer(buffer) => {
+				let resource = buffer.as_resource(state.gpu);
+				Ok(ShaderSource::from_resource(resource))
 			}
 
-			Shader::TextureBuffer(texture_buffer) => {
-				let source = texture_buffer.binding_source_code(state.bind_group_offset, 0);
-
-				println!(
-					"TEXTURE BUFFER | bind_group: {}, binding: {}, source: {}",
-					state.bind_group_offset, state.binding_offset, &source
-				);
-
-				let buffer = GenericTextureBuffer::new(state.gpu, state.shader_stages, texture_buffer.as_ref());
-				let shader_source = ShaderSource::from_buffer(source, buffer, state.bind_group_offset);
-
-				state.bind_group_offset += 1;
-
-				Ok(shader_source)
-			}
+			Shader::BufferResource(buffer_resource) => Ok(ShaderSource::from_resource(buffer_resource)),
 		}
 	}
 
@@ -374,7 +326,6 @@ impl Shader {
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
-
 trait ShaderPath {}
 impl ShaderPath for TypedPath<'_> {}
 impl ShaderPath for TypedPathBuf {}
@@ -443,77 +394,126 @@ where
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 --------------------------------------------------------------------------------
 */
-
 #[derive(Debug, Default)]
 pub struct ShaderSource {
 	pub source: String,
-	pub buffers: BufferMapping,
+	pub resources: Vec<Sarc<dyn ShaderBufferResource>>,
 }
 
 impl ShaderSource {
 	pub fn empty() -> Self {
-		Self::default()
+		Default::default()
 	}
 
 	pub fn from_source(source: String) -> Self {
 		Self {
 			source,
-			..Default::default()
+			..Self::empty()
 		}
 	}
 
-	pub fn from_buffer<B>(source: String, buffer: B, bind_group_index: u32) -> Self
-	where
-		B: ShaderBuffer + Sync + Send + 'static,
-	{
+	pub fn from_resource(resource: Sarc<dyn ShaderBufferResource>) -> Self {
 		Self {
-			source,
-			buffers: BufferMapping(
-				hash_map!(bind_group_index: Sarc(Arc::new(buffer) as Arc<dyn ShaderBuffer + Sync + Send>)),
-			),
+			resources: vec![resource],
+			..Self::empty()
 		}
 	}
 
 	pub fn extend_range(&mut self, other: ShaderSource, range: Range<usize>) -> &mut Self {
 		self.source.replace_range(range, &other.source);
-		self.extend_extras(other)
+		self.resources.extend(other.resources);
+		self
 	}
 
 	pub fn extend(&mut self, other: ShaderSource) -> &mut Self {
 		self.source.push_str(&other.source);
-		self.extend_extras(other)
+		self.resources.extend(other.resources);
+		self
 	}
 
-	pub fn build(self, device: &Device) -> CompiledShader {
-		let shader_module = device.create_shader_module(ShaderModuleDescriptor {
-			label: None,
-			source: wgpu::ShaderSource::Wgsl(<Cow<str>>::from(self.source)),
+	pub fn build(self, gpu: &Gpu, label: String, bind_group_index: u32, visibility: ShaderStages) -> CompiledShader {
+		let mut source = self.source;
+		let mut layouts = Vec::new();
+		let mut bindings = Vec::new();
+
+		let mut binding_index = 0;
+
+		for resource in self.resources.iter() {
+			let local_sources = resource.binding_source_code(bind_group_index, binding_index);
+			let local_layouts = resource.layouts(gpu.device.features());
+			let local_bindings = resource.binding_resources();
+
+			// If all the lengths are not consistent, then there was a programming mistake
+			let offset = local_layouts.len();
+			assert_eq!(offset, local_sources.len());
+			assert_eq!(offset, local_bindings.len());
+
+			source.push_str(&local_sources.join("\n"));
+			source.push_str(resource.other_source_code().unwrap_or_default());
+			layouts.extend(local_layouts);
+			bindings.extend(local_bindings);
+
+			binding_index += offset as u32;
+		}
+
+		let layouts = layouts
+			.into_iter()
+			.zip(0..)
+			.map(|(l, i)| l.into_layout_entry(i, visibility))
+			.collect::<Vec<_>>();
+
+		let bind_group_layout = gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+			label: Some(&format!("{} Bind Group Layout", label)),
+			entries: &layouts,
+		});
+
+		let bind_group = gpu.device.create_bind_group(&BindGroupDescriptor {
+			label: Some(&format!("{} Bind Group", label)),
+			layout: &bind_group_layout,
+			entries: &bindings
+				.into_iter()
+				.zip(0..)
+				.map(|(b, i)| BindGroupEntry {
+					binding: i,
+					resource: b,
+				})
+				.collect::<Vec<_>>(),
+		});
+
+		let shader_module = gpu.device.create_shader_module(ShaderModuleDescriptor {
+			label: Some(&format!("{} Shader Module", label)),
+			source: wgpu::ShaderSource::Wgsl(<Cow<str>>::from(source)),
 		});
 
 		CompiledShader {
 			shader_module,
-			buffers: self.buffers,
+			binding: ShaderBufferBindGroup {
+				index: bind_group_index,
+				bind_group_layout,
+				bind_group,
+			},
 		}
 	}
-
-	fn extend_extras(&mut self, other: ShaderSource) -> &mut Self {
-		self.buffers.0.extend(other.buffers.0);
-		self
-	}
 }
 
-impl Display for ShaderSource {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		writeln!(
-			f,
-			"ShaderSource:\nsource: {}\nbuffers: {:?}",
-			&self.source, &self.buffers
-		)
-	}
-}
+// impl Display for ShaderSource {
+// 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// 		writeln!(
+// 			f,
+// 			"ShaderSource:\nsource: {}\nbuffers: {:?}",
+// 			&self.source, &self.buffers
+// 		)
+// 	}
+// }
 
 #[derive(Debug)]
 pub struct CompiledShader {
 	pub shader_module: ShaderModule,
-	pub buffers: BufferMapping,
+	pub binding: ShaderBufferBindGroup,
+}
+
+impl CompiledShader {
+	pub fn layouts(&self) -> Vec<&BindGroupLayout> {
+		vec![&self.binding.bind_group_layout]
+	}
 }

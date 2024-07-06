@@ -5,8 +5,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	vek::Vec2,
-	ScreenSize,
+	vec2, ScreenSize,
 };
 use pbr_tracer_derive::ShaderStruct;
 use velcro::vec;
@@ -27,10 +26,7 @@ use crate::{
 		render_target::RenderTarget,
 	},
 	libs::{
-		buffer::{
-			self, sampled_texture_buffer::SampledTextureBuffer, uniform_buffer::UniformBuffer, BufferMappingApplicable,
-			GenericDataBuffer, ShaderType,
-		},
+		buffer::{sampled_texture_buffer::SampledTexture, BufferMappingApplicable, ShaderType},
 		shader::{CompiledShader, ShaderBuilder},
 	},
 	ShaderAssets,
@@ -54,16 +50,19 @@ impl Plugin for CompositeRendererPlugin {
 			size: render_target.size,
 		};
 
-		let viewport_buffer = GenericDataBuffer::new(
-			gpu,
-			ShaderStages::FRAGMENT,
-			&UniformBuffer::from_data("viewport_size", viewport_info),
-		);
+		// let viewport_buffer = gpu.
 
-		let composite_renderer = CompositeRenderer::new(gpu, render_target, computer_renderer, viewport_buffer.clone());
+		// UniformBuffer::FromData {
+		// 	var_name: "viewport_size",
+		// 	data: viewport_info,
+		// }
+		// .as_resource(gpu)
+		// .to_owned();
 
-		buffer::register_uniform_auto_update::<ViewportInfo>(app);
-		app.world.spawn((viewport_info, viewport_buffer));
+		let composite_renderer = CompositeRenderer::new(gpu, render_target, computer_renderer);
+
+		// buffer::register_uniform_auto_update::<ViewportInfo>(app);
+		// app.world.spawn((viewport_info, viewport_buffer));
 
 		app.world.insert_resource(composite_renderer);
 
@@ -98,7 +97,7 @@ impl CompositeRenderer {
 		gpu: &Gpu,
 		render_target: &RenderTarget,
 		compute_renderer: &ComputeRenderer,
-		viewport_buffer: GenericDataBuffer,
+		// viewport_buffer: UniformBufferResource,
 	) -> Self {
 		let output_texture = compute_renderer
 			.output_textures
@@ -108,22 +107,19 @@ impl CompositeRenderer {
 
 		let shader = ShaderBuilder::new()
 			.include_path("composite.wgsl")
-			.include_texture(SampledTextureBuffer::new(
-				"out_texture",
-				"out_sampler",
-				buffer::sampled_texture_buffer::SampledTextureBufferBacking::WithBacking(output_texture),
-			))
-			.include_data_buffer(UniformBuffer::<Vec2<u32>>::from_buffer(
-				"viewport_size",
-				viewport_buffer.buffer,
-			))
-			.build(gpu, &ShaderAssets, ShaderStages::FRAGMENT, 0)
+			.include_buffer(SampledTexture::FromTex {
+				texture_var_name: "out_texture",
+				sampler_var_name: "out_sampler",
+				tex: output_texture,
+			})
+			.include_value("viewport_size", vec2!(1920, 1080))
+			.build(gpu, "Composite Shader", &ShaderAssets, ShaderStages::FRAGMENT, 0)
 			.expect("Couldn't build shader");
 
 		// Contains the bind group layouts that are needed in the pipeline
 		let render_pipeline_layout = gpu.device.create_pipeline_layout(&PipelineLayoutDescriptor {
 			label: Some("Render Pipeline Layout"),
-			bind_group_layouts: &shader.buffers.layouts(),
+			bind_group_layouts: &shader.layouts(),
 			push_constant_ranges: &[],
 		});
 
@@ -227,7 +223,7 @@ fn render(composite_renderer: Res<CompositeRenderer>, mut render_target: ResMut<
 
 		render_pass.set_pipeline(&composite_renderer.pipeline);
 
-		render_pass.apply_buffer_mapping(&composite_renderer.shader.buffers);
+		render_pass.apply_buffer_mapping(&composite_renderer.shader.binding);
 
 		// Draw 2 fullscreen triangles
 		// 2 - 3

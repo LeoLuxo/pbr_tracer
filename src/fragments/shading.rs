@@ -4,7 +4,7 @@ use wgpu::{StorageTextureAccess, TextureFormat};
 use super::mpr::Shading;
 use crate::{
 	libs::{
-		buffer::storage_texture_buffer::{StorageTextureBuffer, StorageTextureBufferBacking},
+		buffer::storage_texture_buffer::StorageTexture,
 		shader::{Shader, ShaderBuilder},
 		shader_fragment::ShaderFragment,
 	},
@@ -40,21 +40,18 @@ pub struct CelShading;
 impl Shading for CelShading {}
 impl ShaderFragment for CelShading {
 	fn shader(&self) -> Shader {
-		let gradient = StorageTextureBuffer::new(
-			"cel_gradient",
-			StorageTextureAccess::ReadOnly,
-			StorageTextureBufferBacking::FromImage {
-				label: "cel_gradient",
-				image: TextureAssets::get_image("cel_gradient.png"),
-				format: TextureFormat::Rgba8Unorm,
-				usage: None,
-			},
-		);
+		let gradient = StorageTexture::FromImage {
+			var_name: "cel_gradient",
+			access: StorageTextureAccess::ReadOnly,
+			image: TextureAssets::get_image("cel_gradient.png"),
+			format: TextureFormat::Rgba8Unorm,
+			usage: None,
+		};
 
 		ShaderBuilder::new()
 			.include_path("/shading/cel_shading.wgsl")
 			.include_value("sun_direction", vec3!(1.0, -1.0, 0.0).normalized())
-			.include_texture(gradient)
+			.include_buffer(gradient)
 			.into()
 	}
 }
