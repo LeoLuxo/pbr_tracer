@@ -2,6 +2,7 @@
 struct Intersection {
 	has_hit: bool,
 	object: Object,
+	distance: f32,
 	position: vec3f,
 	normal: vec3f,
 	outgoing: vec3f,
@@ -29,8 +30,9 @@ fn render_pixel(pixel_coord: vec2u, pixel_size: vec2u) {
 	
 	color = post_processing_pipeline(coord, color);
 	
-	let depth = vec4f(intersection.position.zzz, 1.0);
-	let normal = vec4f(intersection.normal, 1.0);
+	// TODO: Set the max distance dynamically
+	let depth = vec4f(vec3f(intersection.distance / 100.0), 1.0);
+	let normal = vec4f(intersection.normal, 1.0) * 0.5 + vec4f(0.5);
 
 	textureStore(output_color, pixel_coord, color);
 	textureStore(output_depth, pixel_coord, depth);
