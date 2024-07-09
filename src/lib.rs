@@ -18,7 +18,7 @@ use core::{
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::{bevy::App, size};
+use brainrot::{bevy::App, size, vec2};
 use fragments::{intersector::*, mpr::MultiPurposeRenderer, post_processing::PostProcessingPipeline, shading::*};
 use image::DynamicImage;
 use rust_embed::Embed;
@@ -70,6 +70,7 @@ pub fn run() {
 		// Standalone raytracer plugins
 		.add_plugin(GpuPlugin)
 		.add_plugin(ComputeRendererPlugin {
+			workgroup_size: vec2!(16, 16),
 			resolution: size!(2000, 1000),
 			filter_mode: FilterMode::Linear,
 			renderer,

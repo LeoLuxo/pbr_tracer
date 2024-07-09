@@ -4,6 +4,8 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
+	vec2,
+	vek::Vec2,
 	ScreenSize,
 };
 use wgpu::{
@@ -30,6 +32,7 @@ use crate::{
 */
 
 pub struct ComputeRendererPlugin<R: Renderer> {
+	pub workgroup_size: Vec2<u32>,
 	pub resolution: ScreenSize,
 	pub filter_mode: FilterMode,
 	pub renderer: R,
@@ -42,7 +45,13 @@ where
 	fn build(&self, app: &mut App) {
 		let gpu = app.world.resource::<Gpu>();
 
-		let compute_renderer = ComputeRenderer::new(gpu, self.resolution, self.filter_mode, &self.renderer);
+		let compute_renderer = ComputeRenderer::new(
+			gpu,
+			self.workgroup_size,
+			self.resolution,
+			self.filter_mode,
+			&self.renderer,
+		);
 
 		app.world.insert_resource(compute_renderer);
 
@@ -61,6 +70,7 @@ pub struct ComputeRenderPass;
 
 #[derive(bevy::Resource)]
 pub struct ComputeRenderer {
+	workgroup_size: Vec2<u32>,
 	resolution: ScreenSize,
 	pipeline: ComputePipeline,
 	shader: CompiledShader,
@@ -68,10 +78,20 @@ pub struct ComputeRenderer {
 }
 
 impl ComputeRenderer {
-	pub fn new(gpu: &Gpu, resolution: ScreenSize, filter_mode: FilterMode, renderer: &dyn Renderer) -> Self {
+	pub fn new(
+		gpu: &Gpu,
+		workgroup_size: Vec2<u32>,
+		resolution: ScreenSize,
+		filter_mode: FilterMode,
+		renderer: &dyn Renderer,
+	) -> Self {
 		// Dynamically create shader from the renderer
 		let mut shader = ShaderBuilder::new();
-		shader.include_path("compute.wgsl").include(renderer.shader());
+		shader
+			.include_path("compute.wgsl")
+			.include(renderer.shader())
+			.define("WORKGROUP_X", format!("{}", workgroup_size.x))
+			.define("WORKGROUP_Y", format!("{}", workgroup_size.y));
 		// .include_value("out_resolution", resolution);
 
 		// The sampler that will be added to all output textures
@@ -118,6 +138,7 @@ impl ComputeRenderer {
 		});
 
 		Self {
+			workgroup_size,
 			resolution,
 			pipeline,
 			shader,
@@ -147,8 +168,8 @@ fn render(compute_renderer: Res<ComputeRenderer>, mut render_target: ResMut<Rend
 
 		compute_pass.apply_buffer_mapping(&compute_renderer.shader.binding);
 
-		// TODO: Change workgroup size to 64
-		compute_pass.dispatch_workgroups(compute_renderer.resolution.w, compute_renderer.resolution.h, 1);
+		let workgroups = <Vec2<u32>>::from(compute_renderer.resolution) / compute_renderer.workgroup_size + vec2!(1);
+		compute_pass.dispatch_workgroups(workgroups.x, workgroups.y, 1);
 	}
 
 	render_target.command_queue.push(encoder.finish());
