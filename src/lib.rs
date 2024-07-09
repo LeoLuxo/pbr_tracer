@@ -3,6 +3,7 @@ pub mod fragments;
 pub mod libs;
 
 use core::{
+	camera::CameraPlugin,
 	display::DisplayPlugin,
 	event_processing::EventProcessingPlugin,
 	events::EventsPlugin,
@@ -10,6 +11,7 @@ use core::{
 	gpu::GpuPlugin,
 	render_target::WindowRenderTargetPlugin,
 	rendering::{
+		camera_view::CameraViewPlugin,
 		composite::{CompositeRenderPass, CompositeRendererPlugin},
 		compute::{ComputeRenderPass, ComputeRendererPlugin},
 		render::{InnerRenderPass, PostRenderPass, PreRenderPass, RenderPass, RenderPlugin},
@@ -67,8 +69,16 @@ pub fn run() {
 	};
 
 	App::new()
-		// Standalone raytracer plugins
+		// Core plugins
 		.add_plugin(GpuPlugin)
+		.add_plugin(CameraPlugin)
+		.add_plugin(CameraViewPlugin)
+		.add_plugin(EventProcessingPlugin)
+		.add_plugin(EventsPlugin)
+		.add_plugin(GameloopPlugin)
+		.add_plugin(DisplayPlugin)
+		.add_plugin(WindowRenderTargetPlugin)
+		// Compute renderer
 		.add_plugin(ComputeRendererPlugin {
 			workgroup_size: vec2!(16, 16),
 			resolution: size!(2000, 1000),
@@ -76,12 +86,6 @@ pub fn run() {
 			renderer,
 			// renderer: DebugRenderer,
 		})
-		// Core plugins
-		.add_plugin(EventProcessingPlugin)
-		.add_plugin(EventsPlugin)
-		.add_plugin(GameloopPlugin)
-		.add_plugin(DisplayPlugin)
-		.add_plugin(WindowRenderTargetPlugin)
 		// Rendering plugins
 		.add_plugin(RenderPlugin)
 		.add_plugin(CompositeRendererPlugin)

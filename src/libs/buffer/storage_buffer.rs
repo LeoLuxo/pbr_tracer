@@ -6,10 +6,7 @@ use wgpu::{
 };
 
 use super::{BufferUploadable, PartialLayoutEntry, ShaderBufferDescriptor, ShaderBufferResource};
-use crate::{
-	core::gpu::Gpu,
-	libs::{buffer::ShaderType, smart_arc::Sarc},
-};
+use crate::{core::gpu::Gpu, libs::smart_arc::Sarc};
 
 /*
 --------------------------------------------------------------------------------
@@ -19,7 +16,7 @@ use crate::{
 
 pub enum StorageBuffer<T, S>
 where
-	T: BufferUploadable + ShaderType,
+	T: BufferUploadable,
 	S: Into<String> + Clone,
 {
 	New {
@@ -41,9 +38,11 @@ where
 
 impl<T, S> StorageBuffer<T, S>
 where
-	T: BufferUploadable + ShaderType,
+	T: BufferUploadable,
 	S: Into<String> + Clone,
 {
+	// TODO refactor this so it's like uniformbuffer
+
 	pub fn raw_buffer_from_size(gpu: &Gpu, label: &str, size: u64) -> Buffer {
 		gpu.device.create_buffer(&BufferDescriptor {
 			label: Some(label),
@@ -64,12 +63,12 @@ where
 
 impl<T, S> ShaderBufferDescriptor for StorageBuffer<T, S>
 where
-	T: BufferUploadable + ShaderType,
+	T: BufferUploadable,
 	S: Into<String> + Clone,
 {
 	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource> {
-		let type_name = <T as ShaderType>::type_name();
-		let struct_definition = <T as ShaderType>::struct_definition();
+		let type_name = T::type_name();
+		let struct_definition = T::struct_definition();
 
 		let resource = match self {
 			StorageBuffer::New {

@@ -1,3 +1,4 @@
+pub mod camera;
 pub mod display;
 pub mod event_processing;
 pub mod events;

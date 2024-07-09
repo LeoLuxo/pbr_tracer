@@ -53,13 +53,13 @@ pub trait ShaderType {
 // impl WgslType for f16 {fn name() -> String {format!("f16")}}
 
 pub trait BufferUploadable: std::fmt::Debug + ShaderType {
-	fn get_size(&self) -> u64;
+	fn get_size() -> u64;
 	fn get_bytes(&self) -> Vec<u8>;
 }
 
 // This blanket impl excludes [E]
 impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> BufferUploadable for T {
-	fn get_size(&self) -> u64 {
+	fn get_size() -> u64 {
 		mem::size_of::<Self>() as u64
 	}
 

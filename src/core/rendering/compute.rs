@@ -1,4 +1,5 @@
 use bevy_ecs::{
+	query::With,
 	schedule::IntoSystemConfigs,
 	system::{Res, ResMut},
 };
@@ -9,14 +10,17 @@ use brainrot::{
 	ScreenSize,
 };
 use wgpu::{
-	CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
+	Buffer, CommandEncoderDescriptor, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, FilterMode,
 	SamplerBorderColor, ShaderStages, StorageTextureAccess,
 };
 
+use super::camera_view::CameraView;
 use crate::{
-	core::{gameloop::Render, gpu::Gpu, render_target::RenderTarget},
+	core::{camera::Camera, gameloop::Render, gpu::Gpu, render_target::RenderTarget},
 	libs::{
-		buffer::{storage_texture_buffer::StorageTexture, BufferMappingApplicable},
+		buffer::{
+			storage_texture_buffer::StorageTexture, uniform_buffer::UniformBufferDescriptor, BufferMappingApplicable,
+		},
 		shader::{CompiledShader, ShaderBuilder},
 		shader_fragment::Renderer,
 		smart_arc::Sarc,
@@ -43,14 +47,22 @@ where
 	R: Renderer + 'static,
 {
 	fn build(&self, app: &mut App) {
+		let camera_buffer = app
+			.world
+			.query_filtered::<&Sarc<Buffer>, With<Camera>>()
+			.single(&app.world)
+			.clone();
+
 		let gpu = app.world.resource::<Gpu>();
 
+		// TODO: Somehow clean up all the plugin vs resource instance stuff?
 		let compute_renderer = ComputeRenderer::new(
 			gpu,
 			self.workgroup_size,
 			self.resolution,
 			self.filter_mode,
 			&self.renderer,
+			camera_buffer,
 		);
 
 		app.world.insert_resource(compute_renderer);
@@ -84,6 +96,7 @@ impl ComputeRenderer {
 		resolution: ScreenSize,
 		filter_mode: FilterMode,
 		renderer: &dyn Renderer,
+		camera_buffer: Sarc<Buffer>,
 	) -> Self {
 		// Dynamically create shader from the renderer
 		let mut shader = ShaderBuilder::new();
@@ -91,8 +104,11 @@ impl ComputeRenderer {
 			.include_path("compute.wgsl")
 			.include(renderer.shader())
 			.define("WORKGROUP_X", format!("{}", workgroup_size.x))
-			.define("WORKGROUP_Y", format!("{}", workgroup_size.y));
-		// .include_value("out_resolution", resolution);
+			.define("WORKGROUP_Y", format!("{}", workgroup_size.y))
+			.include_buffer(UniformBufferDescriptor::FromBuffer::<CameraView, _> {
+				var_name: "camera",
+				buffer: camera_buffer,
+			});
 
 		// The sampler that will be added to all output textures
 		let output_sampler = Some(TexSamplerDescriptor {

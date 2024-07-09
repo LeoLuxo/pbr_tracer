@@ -93,6 +93,10 @@ impl UniformBuffer {
 		}
 	}
 
+	pub fn raw_buffer_from_type<T: BufferUploadable>(gpu: &Gpu, label: Option<&str>) -> Buffer {
+		Self::raw_buffer_from_size(gpu, T::get_size(), label)
+	}
+
 	pub fn raw_buffer_from_size(gpu: &Gpu, size: u64, label: Option<&str>) -> Buffer {
 		gpu.device.create_buffer(&BufferDescriptor {
 			label: label.or(Some(&format!("UniformBuffer<size: {}>", size))),
@@ -102,10 +106,7 @@ impl UniformBuffer {
 		})
 	}
 
-	pub fn raw_buffer_from_data<T>(gpu: &Gpu, data: &T, label: Option<&str>) -> Buffer
-	where
-		T: BufferUploadable,
-	{
+	pub fn raw_buffer_from_data<T: BufferUploadable>(gpu: &Gpu, data: &T, label: Option<&str>) -> Buffer {
 		gpu.device.create_buffer_init(&BufferInitDescriptor {
 			label: label.or(Some(&format!("UniformBuffer<{}>", T::type_name()))),
 			contents: &data.get_bytes(),

@@ -10,7 +10,7 @@ brainrot = { path = "../brainrot", features = ["shader"] }
 
 
 [dependencies]
-brainrot          = { path = "../brainrot", features = ["bevy", "convert", "shader", "texture", "vec"] }
+brainrot          = { path = "../brainrot", features = ["angle", "bevy", "camera_3d", "convert", "shader", "speed", "texture", "vec"] }
 pbr_tracer_derive = { version = "0.1.0", path = "pbr_tracer_derive" }
 
 bevy_ecs   = "=0.13.2"
