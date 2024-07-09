@@ -5,13 +5,14 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	vec2, ScreenSize,
+	vek::Vec2,
+	ScreenSize,
 };
 use pbr_tracer_derive::ShaderStruct;
 use velcro::vec;
 use wgpu::{
-	BlendState, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState, FrontFace, LoadOp,
-	MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
+	BlendState, Buffer, Color, ColorTargetState, ColorWrites, CommandEncoderDescriptor, FragmentState, FrontFace,
+	LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
 	RenderPassColorAttachment, RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, ShaderStages, StoreOp,
 	VertexState,
 };
@@ -26,8 +27,14 @@ use crate::{
 		render_target::RenderTarget,
 	},
 	libs::{
-		buffer::{sampled_texture_buffer::SampledTexture, BufferMappingApplicable, ShaderType},
+		buffer::{
+			self,
+			sampled_texture_buffer::SampledTexture,
+			uniform_buffer::{UniformBuffer, UniformBufferDescriptor},
+			BufferMappingApplicable, ShaderType,
+		},
 		shader::{CompiledShader, ShaderBuilder},
+		smart_arc::Sarc,
 	},
 	ShaderAssets,
 };
@@ -49,21 +56,11 @@ impl Plugin for CompositeRendererPlugin {
 		let viewport_info = ViewportInfo {
 			size: render_target.size,
 		};
+		let viewport_buffer = Sarc::new(UniformBuffer::raw_buffer_from_data(gpu, &viewport_info, None));
 
-		// let viewport_buffer = gpu.
+		let composite_renderer = CompositeRenderer::new(gpu, render_target, computer_renderer, viewport_buffer.clone());
 
-		// UniformBuffer::FromData {
-		// 	var_name: "viewport_size",
-		// 	data: viewport_info,
-		// }
-		// .as_resource(gpu)
-		// .to_owned();
-
-		let composite_renderer = CompositeRenderer::new(gpu, render_target, computer_renderer);
-
-		// buffer::register_uniform_auto_update::<ViewportInfo>(app);
-		// app.world.spawn((viewport_info, viewport_buffer));
-
+		buffer::spawn_buffer(app, viewport_info, viewport_buffer);
 		app.world.insert_resource(composite_renderer);
 
 		app.add_systems(Update, resize);
@@ -97,7 +94,7 @@ impl CompositeRenderer {
 		gpu: &Gpu,
 		render_target: &RenderTarget,
 		compute_renderer: &ComputeRenderer,
-		// viewport_buffer: UniformBufferResource,
+		viewport_buffer: Sarc<Buffer>,
 	) -> Self {
 		let output_texture = compute_renderer
 			.output_textures
@@ -112,7 +109,10 @@ impl CompositeRenderer {
 				sampler_var_name: "out_sampler",
 				tex: output_texture,
 			})
-			.include_value("viewport_size", vec2!(1920, 1080))
+			.include_buffer(UniformBufferDescriptor::FromBuffer::<Vec2<u32>, _> {
+				var_name: "viewport_size",
+				buffer: viewport_buffer,
+			})
 			.build(gpu, "Composite Shader", &ShaderAssets, ShaderStages::FRAGMENT, 0)
 			.expect("Couldn't build shader");
 

@@ -5,14 +5,18 @@ pub mod uniform_buffer;
 
 use std::{fmt::Debug, mem, num::NonZero};
 
-use brainrot::vek::{self};
+use bevy_ecs::system::{Query, Res};
+use brainrot::{
+	bevy::{self, App},
+	vek,
+};
 use wgpu::{
-	BindGroup, BindGroupLayout, BindGroupLayoutEntry, BindingResource, BindingType, ComputePass, Features, RenderPass,
-	ShaderStages,
+	BindGroup, BindGroupLayout, BindGroupLayoutEntry, BindingResource, BindingType, Buffer, ComputePass, Features,
+	RenderPass, ShaderStages,
 };
 
 use super::smart_arc::Sarc;
-use crate::core::gpu::Gpu;
+use crate::core::{gameloop::PreRender, gpu::Gpu};
 
 /*
 --------------------------------------------------------------------------------
@@ -48,29 +52,19 @@ pub trait ShaderType {
 // Incompatible:
 // impl WgslType for f16 {fn name() -> String {format!("f16")}}
 
-pub trait DataBufferUploadable: std::fmt::Debug {
+pub trait BufferUploadable: std::fmt::Debug + ShaderType {
 	fn get_size(&self) -> u64;
 	fn get_bytes(&self) -> Vec<u8>;
-	fn type_name(&self) -> String;
-	fn struct_definition(&self) -> Option<String>;
 }
 
 // This blanket impl excludes [E]
-impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> DataBufferUploadable for T {
+impl<T: ShaderType + bytemuck::Pod + Sized + std::fmt::Debug> BufferUploadable for T {
 	fn get_size(&self) -> u64 {
 		mem::size_of::<Self>() as u64
 	}
 
 	fn get_bytes(&self) -> Vec<u8> {
 		bytemuck::bytes_of(self).to_owned()
-	}
-
-	fn type_name(&self) -> String {
-		<Self as ShaderType>::type_name()
-	}
-
-	fn struct_definition(&self) -> Option<String> {
-		<Self as ShaderType>::struct_definition()
 	}
 }
 
@@ -106,12 +100,6 @@ pub trait ShaderBufferResource {
 	fn layouts(&self, features: Features) -> Vec<PartialLayoutEntry>;
 	fn binding_resources(&self) -> Vec<BindingResource>;
 }
-
-// pub trait ShaderBuffer {
-// 	fn label(&self) -> &str;
-// 	fn bind_group_layout(&self) -> &BindGroupLayout;
-// 	fn bind_group(&self) -> &BindGroup;
-// }
 
 /*
 --------------------------------------------------------------------------------
@@ -155,17 +143,31 @@ impl<'a> BufferMappingApplicable<'a> for RenderPass<'a> {
 --------------------------------------------------------------------------------
 */
 
-// pub fn register_uniform_auto_update<T>(app: &mut App)
-// where
-// 	T: DataBufferUploadable + bevy::Component + Send + Sync,
-// {
-// 	app.add_systems(PreRender, upload_buffers_system::<T>);
-// }
+pub fn spawn_buffer<T>(app: &mut App, data: T, buffer: Sarc<Buffer>)
+where
+	T: BufferUploadable + bevy::Component + Send + Sync,
+{
+	register_auto_update::<T>(app);
+	app.world.spawn((data, buffer));
+}
 
-// fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &GenericDataBuffer)>)
-// where
-// 	T: DataBufferUploadable + bevy::Component + Send + Sync,
-// {
+pub fn register_auto_update<T>(app: &mut App)
+where
+	T: BufferUploadable + bevy::Component + Send + Sync,
+{
+	app.add_systems(PreRender, upload_buffers_system::<T>);
+}
+
+fn upload_buffers_system<T>(gpu: Res<Gpu>, q: Query<(&T, &Sarc<Buffer>)>)
+where
+	T: BufferUploadable + bevy::Component + Send + Sync,
+{
+	for (data, buffer) in q.iter() {
+		buffer.upload_bytes(&gpu, &data.get_bytes(), 0);
+	}
+}
+
+// fn upload_buffers_system(gpu: Res<Gpu>, q: Query<(&Sarc<dyn BufferUploadable + Send + Sync>, &Sarc<Buffer>)>) {
 // 	for (data, buffer) in q.iter() {
 // 		buffer.upload_bytes(&gpu, &data.get_bytes(), 0);
 // 	}

@@ -5,7 +5,7 @@ use wgpu::{
 	BindingResource, BindingType, Buffer, BufferAddress, BufferBindingType, BufferDescriptor, BufferUsages, Features,
 };
 
-use super::{DataBufferUploadable, PartialLayoutEntry, ShaderBufferDescriptor, ShaderBufferResource};
+use super::{BufferUploadable, PartialLayoutEntry, ShaderBufferDescriptor, ShaderBufferResource};
 use crate::{
 	core::gpu::Gpu,
 	libs::{buffer::ShaderType, smart_arc::Sarc},
@@ -19,7 +19,7 @@ use crate::{
 
 pub enum StorageBuffer<T, S>
 where
-	T: DataBufferUploadable + ShaderType,
+	T: BufferUploadable + ShaderType,
 	S: Into<String> + Clone,
 {
 	New {
@@ -39,9 +39,32 @@ where
 	},
 }
 
+impl<T, S> StorageBuffer<T, S>
+where
+	T: BufferUploadable + ShaderType,
+	S: Into<String> + Clone,
+{
+	pub fn raw_buffer_from_size(gpu: &Gpu, label: &str, size: u64) -> Buffer {
+		gpu.device.create_buffer(&BufferDescriptor {
+			label: Some(label),
+			size,
+			usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+			mapped_at_creation: false,
+		})
+	}
+
+	pub fn raw_buffer_from_data(gpu: &Gpu, label: &str, data: &T) -> Buffer {
+		gpu.device.create_buffer_init(&BufferInitDescriptor {
+			label: Some(label),
+			contents: &data.get_bytes(),
+			usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+		})
+	}
+}
+
 impl<T, S> ShaderBufferDescriptor for StorageBuffer<T, S>
 where
-	T: DataBufferUploadable + ShaderType,
+	T: BufferUploadable + ShaderType,
 	S: Into<String> + Clone,
 {
 	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource> {
@@ -55,12 +78,11 @@ where
 				size,
 			} => {
 				let var_name = var_name.to_owned().into();
-				let buffer = Sarc::new(gpu.device.create_buffer(&BufferDescriptor {
-					label: Some(&format!("StorageBuffer<{}> '{}'", type_name, var_name)),
-					size: *size,
-					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-					mapped_at_creation: false,
-				}));
+				let buffer = Sarc::new(Self::raw_buffer_from_size(
+					gpu,
+					&format!("StorageBuffer<{}> '{}'", type_name, var_name),
+					*size,
+				));
 
 				StorageBufferResource {
 					buffer,
@@ -77,11 +99,11 @@ where
 				data,
 			} => {
 				let var_name = var_name.to_owned().into();
-				let buffer = Sarc::new(gpu.device.create_buffer_init(&BufferInitDescriptor {
-					label: Some(&format!("StorageBuffer<{}> '{}'", type_name, var_name)),
-					contents: &data.get_bytes(),
-					usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-				}));
+				let buffer = Sarc::new(Self::raw_buffer_from_data(
+					gpu,
+					&format!("StorageBuffer<{}> '{}'", type_name, var_name),
+					data,
+				));
 
 				StorageBufferResource {
 					buffer,

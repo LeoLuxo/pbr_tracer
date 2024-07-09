@@ -18,7 +18,7 @@ use wgpu::{
 
 use super::{
 	buffer::{
-		uniform_buffer::UniformBuffer, DataBufferUploadable, ShaderBufferBindGroup, ShaderBufferDescriptor,
+		uniform_buffer::UniformBufferDescriptor, BufferUploadable, ShaderBufferBindGroup, ShaderBufferDescriptor,
 		ShaderBufferResource, ShaderType,
 	},
 	embed::Assets,
@@ -65,10 +65,10 @@ impl ShaderBuilder {
 
 	pub fn include_value<T, S>(&mut self, var_name: S, value: T) -> &mut Self
 	where
-		T: DataBufferUploadable + ShaderType + 'static,
+		T: BufferUploadable + ShaderType + 'static,
 		S: Into<String> + Clone + 'static,
 	{
-		self.include_buffer(UniformBuffer::FromData { var_name, data: value })
+		self.include_buffer(UniformBufferDescriptor::FromData { var_name, data: value })
 	}
 
 	pub fn define<K, V>(&mut self, key: K, value: V) -> &mut Self
@@ -419,18 +419,21 @@ impl ShaderSource {
 		}
 	}
 
+	/// Extend the shader source by replacing a specific range of the source code
 	pub fn extend_range(&mut self, other: ShaderSource, range: Range<usize>) -> &mut Self {
 		self.source.replace_range(range, &other.source);
 		self.resources.extend(other.resources);
 		self
 	}
 
+	/// Extend the shader source by appending to the end of the source code
 	pub fn extend(&mut self, other: ShaderSource) -> &mut Self {
 		self.source.push_str(&other.source);
 		self.resources.extend(other.resources);
 		self
 	}
 
+	/// Build the ShaderSource into a CompiledShader
 	pub fn build(self, gpu: &Gpu, label: String, bind_group_index: u32, visibility: ShaderStages) -> CompiledShader {
 		let mut source = self.source;
 		let mut layouts = Vec::new();
@@ -438,12 +441,14 @@ impl ShaderSource {
 
 		let mut binding_index = 0;
 
+		// Go through all the resources and accumulate their source code, layouts and binding resources
+		// Could technically have been done with some iterator magic but was simpler and cleaner like this
 		for resource in self.resources.iter() {
 			let local_sources = resource.binding_source_code(bind_group_index, binding_index);
 			let local_layouts = resource.layouts(gpu.device.features());
 			let local_bindings = resource.binding_resources();
 
-			// If all the lengths are not consistent, then there was a programming mistake
+			// If all the lengths are not consistent, then there was a programming mistake and might as well panic to avoid bugs down the line
 			let offset = local_layouts.len();
 			assert_eq!(offset, local_sources.len());
 			assert_eq!(offset, local_bindings.len());
@@ -456,17 +461,20 @@ impl ShaderSource {
 			binding_index += offset as u32;
 		}
 
+		// Converte the partial layout entry to a proper bind group layout entry
 		let layouts = layouts
 			.into_iter()
 			.zip(0..)
 			.map(|(l, i)| l.into_layout_entry(i, visibility))
 			.collect::<Vec<_>>();
 
+		// The bind group layout for the entire shader
 		let bind_group_layout = gpu.device.create_bind_group_layout(&BindGroupLayoutDescriptor {
 			label: Some(&format!("{} Bind Group Layout", label)),
 			entries: &layouts,
 		});
 
+		// The bind group for the entire shader
 		let bind_group = gpu.device.create_bind_group(&BindGroupDescriptor {
 			label: Some(&format!("{} Bind Group", label)),
 			layout: &bind_group_layout,
@@ -495,16 +503,6 @@ impl ShaderSource {
 		}
 	}
 }
-
-// impl Display for ShaderSource {
-// 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-// 		writeln!(
-// 			f,
-// 			"ShaderSource:\nsource: {}\nbuffers: {:?}",
-// 			&self.source, &self.buffers
-// 		)
-// 	}
-// }
 
 #[derive(Debug)]
 pub struct CompiledShader {

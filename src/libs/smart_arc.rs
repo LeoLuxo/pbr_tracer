@@ -5,6 +5,11 @@ use std::{
 	sync::Arc,
 };
 
+use brainrot::bevy;
+use wgpu::{Buffer, BufferAddress};
+
+use crate::core::gpu::Gpu;
+
 /*
 --------------------------------------------------------------------------------
 ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -12,6 +17,7 @@ use std::{
 */
 
 /// Smart Atomic Reference Counter
+#[derive(bevy::Component)]
 pub struct Sarc<T: ?Sized>(pub Arc<T>);
 
 impl<T: Sized> Sarc<T> {
@@ -39,8 +45,7 @@ impl<T: ?Sized> Hash for Sarc<T> {
 	where
 		H: Hasher,
 	{
-		// Voodoo magic, but basically we're hashing using the numeric value of the
-		// pointer of the Arc
+		// Voodoo magic, but basically we're hashing using the numeric value of the pointer of the Arc
 		hasher.write_usize(Arc::as_ptr(&self.0) as *const () as usize);
 	}
 }
@@ -62,5 +67,11 @@ impl<T: ?Sized> Deref for Sarc<T> {
 impl<T: ?Sized> AsRef<T> for Sarc<T> {
 	fn as_ref(&self) -> &T {
 		self.0.as_ref()
+	}
+}
+
+impl Sarc<Buffer> {
+	pub fn upload_bytes(&self, gpu: &Gpu, bytes: &[u8], offset: BufferAddress) {
+		gpu.queue.write_buffer(self, offset, bytes)
 	}
 }
