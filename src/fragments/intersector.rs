@@ -20,7 +20,6 @@ pub struct Raymarcher;
 pub struct RaymarchSettings {
 	epsilon: f32,
 	min_march: f32,
-	max_march: f32,
 	max_march_steps: u32,
 }
 
@@ -29,7 +28,6 @@ impl Default for RaymarchSettings {
 		Self {
 			epsilon: 0.00001,
 			min_march: 0.001,
-			max_march: 1000.0,
 			max_march_steps: 100,
 		}
 	}

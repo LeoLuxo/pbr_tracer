@@ -64,27 +64,42 @@ impl Plugin for CameraViewPlugin {
 #[repr(C)]
 #[derive(ShaderStruct, bytemuck::Pod, bytemuck::Zeroable, bevy::Component, Copy, Clone, Debug, Default, PartialEq)]
 pub struct CameraView {
-	// vek::Mat4 supports bytemuck
+	pub z_near: f32,
+	pub z_far: f32,
+
+	pub y_fov: f32,
+	pub focal_length: f32,
+
 	pub view_mat: Mat4<f32>,
 	pub inverse_view_mat: Mat4<f32>,
 	pub proj_mat: Mat4<f32>,
 }
 
-impl CameraView {
-	pub fn new(position: Position, direction: Direction, frustum: Frustum, size: ScreenSize) -> Self {
-		Self {
-			view_mat: calc_view_matrix(position, direction),
-			inverse_view_mat: calc_view_matrix(position, direction).inverted(),
-			proj_mat: calc_projection_matrix(frustum, size),
-		}
-	}
-}
-
 fn update_view(
 	render_target: Res<RenderTarget<'static>>,
-	mut q: Query<(&Position, &Direction, &Frustum, &mut CameraView), With<Camera>>,
+	mut q: Query<(&Position, &Direction, &Frustum, &mut CameraView)>,
 ) {
 	for (position, direction, frustum, mut view) in q.iter_mut() {
-		*view = CameraView::new(*position, *direction, *frustum, render_target.size);
+		let position = *position;
+		let direction = *direction;
+		let size = render_target.size;
+		let z_near = frustum.z_near;
+		let z_far = frustum.z_far;
+		let y_fov = frustum.y_fov;
+
+		let focal_length = (size.h as f32) / 2.0 / (y_fov / 2.0).tan();
+		let view_mat = calc_view_matrix(position, direction);
+		let inverse_view_mat = calc_view_matrix(position, direction).inverted();
+		let proj_mat = calc_projection_matrix(*frustum, size);
+
+		*view = CameraView {
+			z_near,
+			z_far,
+			y_fov,
+			focal_length,
+			view_mat,
+			inverse_view_mat,
+			proj_mat,
+		}
 	}
 }

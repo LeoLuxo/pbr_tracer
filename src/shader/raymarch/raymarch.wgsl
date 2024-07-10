@@ -4,6 +4,14 @@
 
 
 fn intersect_scene(ray_origin: vec3f, ray_dir: vec3f) -> Intersection {
+	// struct Intersection {
+	// 	has_hit: bool,
+	// 	object: Object,
+	// 	distance: f32,
+	// 	position: vec3f,
+	// 	normal: vec3f,
+	// 	outgoing: vec3f,
+	// }
 	let object = Object(vec3f(1, 0, 0));
 	var intersection = Intersection(false, object, 0.0, vec3f(0), vec3f(0), -ray_dir);
 	
@@ -11,22 +19,21 @@ fn intersect_scene(ray_origin: vec3f, ray_dir: vec3f) -> Intersection {
 	var t = settings.min_march;
 	var p = ray_origin;
 	
-	for (iters = 0u; iters < settings.max_march_steps && t < settings.max_march; iters++) {
+	for (iters = 0u; iters < settings.max_march_steps && t < camera.z_far; iters++) {
 		p = ray_origin + ray_dir * t;
 		
 		let distance = sdf(p);
 		
 		if (distance < settings.epsilon) {
-			intersection.distance = t;
-			intersection.position = p;
 			break;
 		}
 		
 		t += distance;
 	}
 	
-	if (t >= settings.max_march) {
+	if (t >= camera.z_far) {
 		// Marched too far away, we didn't hit anything
+		intersection.distance = camera.z_far;
 		return intersection;
 	}
 	
@@ -50,5 +57,6 @@ fn calc_normal(p: vec3f) -> vec3f {
 }
 
 fn sdf(p: vec3f) -> f32 {
-	return sphere(p, 1.0);
+	return min(sphere(p, 1.0), sphere(p - vec3f(2, 3, 1), 2.0));
+	// return sphere(p, 1.0);
 }

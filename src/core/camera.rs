@@ -6,7 +6,7 @@ use bevy_ecs::{
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
-	calc_forward_horizontal_vector, calc_right_vector, deg, rad, spd, Angle, Direction, Frustum, Position, Speed,
+	calc_forward_horizontal_vector, calc_right_vector, deg, rad, spd, vec3, Angle, Direction, Frustum, Position, Speed,
 	SAFE_FRAC_PI_2,
 };
 use derive_more::{Deref, Display, From};
@@ -46,9 +46,9 @@ impl Plugin for CameraPlugin {
 				frustum: Frustum {
 					y_fov: 45_f32.to_radians(),
 					z_near: 0.3,
-					z_far: 1000.0,
+					z_far: 20.0,
 				},
-				position: Default::default(),
+				position: vec3!(0.0, 0.0, -5.0).into(),
 				direction: Default::default(),
 			},
 			CameraControlBundle {
