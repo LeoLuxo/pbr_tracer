@@ -8,7 +8,7 @@ use brainrot::{
 	bevy::{self, App, Plugin},
 	calc_projection_matrix, calc_view_matrix,
 	vek::Mat4,
-	Direction, Frustum, Position, ScreenSize,
+	Direction, Frustum, Position,
 };
 use pbr_tracer_derive::ShaderStruct;
 

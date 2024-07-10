@@ -61,9 +61,9 @@ where
 		};
 
 		std::vec![
-			("output_depth".to_string(), depth),
-			("output_normal".to_string(), normal),
 			("output_color".to_string(), self.default_color_texture(resolution)),
+			("output_normal".to_string(), normal),
+			("output_depth".to_string(), depth),
 		]
 	}
 }
