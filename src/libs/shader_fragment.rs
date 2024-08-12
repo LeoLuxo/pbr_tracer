@@ -10,8 +10,17 @@ use crate::libs::shader::Shader;
 --------------------------------------------------------------------------------
 */
 
-pub trait ShaderFragment: Sync + Send {
+pub trait ShaderFragment {
 	fn shader(&self) -> Shader;
+}
+
+impl<T> ShaderFragment for T
+where
+	T: Into<Shader> + Clone,
+{
+	fn shader(&self) -> Shader {
+		self.to_owned().into()
+	}
 }
 
 /// Shader API:\

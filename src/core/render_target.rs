@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use bevy_ecs::{
 	event::EventReader,
-	system::{Res, ResMut},
+	query::With,
+	system::{Query, Res, ResMut},
 };
 use brainrot::{
 	bevy::{self, App, Plugin},
@@ -18,7 +19,10 @@ use super::{
 	event_processing::{EventReaderProcessor, ProcessedChangeEvents},
 	gpu::Gpu,
 };
-use crate::core::{display::AppWindow, events::WindowResizedEvent, gameloop::Update};
+use crate::{
+	core::{display::AppWindow, events::WindowResizedEvent, gameloop::Update},
+	EntityLabel,
+};
 
 /*
 --------------------------------------------------------------------------------
@@ -26,33 +30,10 @@ use crate::core::{display::AppWindow, events::WindowResizedEvent, gameloop::Upda
 --------------------------------------------------------------------------------
 */
 
-pub struct WindowRenderTargetPlugin;
-
-impl Plugin for WindowRenderTargetPlugin {
-	fn build(&self, app: &mut App) {
-		let app_window = app.world.resource::<AppWindow>();
-		let gpu = app.world.resource::<Gpu>();
-
-		let render_target = RenderTarget::from_window(app_window.winit_window.clone(), gpu);
-
-		app.world.insert_resource(render_target);
-
-		app.add_systems(Update, resize);
-	}
-}
-
-/*
---------------------------------------------------------------------------------
-||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
---------------------------------------------------------------------------------
-*/
-
-//TODO make RenderTarget into a component (or other) to support multiple draw
-// surfaces
-
-#[derive(bevy::Resource)]
-pub struct RenderTarget<'a> {
-	pub surface: Surface<'a>,
+//TODO make RenderTarget into a component (or other) to support multiple draw surfaces
+#[derive(bevy::Component)]
+pub struct RenderTarget {
+	pub surface: Surface<'static>,
 	pub size: ScreenSize,
 	pub capabilities: SurfaceCapabilities,
 	pub config: SurfaceConfiguration,
@@ -63,7 +44,7 @@ pub struct RenderTarget<'a> {
 	pub current_view: Option<TextureView>,
 }
 
-impl<'a> RenderTarget<'a> {
+impl RenderTarget {
 	fn from_window(window: Arc<Window>, gpu: &Gpu) -> Self {
 		// Window is passed as arc so that the surface creation can be done safely
 
@@ -123,14 +104,35 @@ impl<'a> RenderTarget<'a> {
 --------------------------------------------------------------------------------
 */
 
+pub struct WindowRenderTargetPlugin;
+
+impl Plugin for WindowRenderTargetPlugin {
+	fn build(&self, app: &mut App) {
+		let app_window = app.world.resource::<AppWindow>();
+		let gpu = app.world.resource::<Gpu>();
+
+		let render_target = RenderTarget::from_window(app_window.winit_window.clone(), gpu);
+
+		app.world.spawn((render_target, WindowRenderTarget));
+
+		app.add_systems(Update, resize);
+	}
+}
+
+#[derive(bevy::Component)]
+pub struct WindowRenderTarget;
+impl EntityLabel for WindowRenderTarget {}
+
 fn resize(
-	mut render_target: ResMut<RenderTarget<'static>>,
 	gpu: Res<Gpu>,
 	window_events: EventReader<WindowResizedEvent>,
+	mut render_targets: Query<&mut RenderTarget, With<WindowRenderTarget>>,
 ) {
 	if let Some(size) = window_events.process().latest() {
-		render_target.config.width = size.w;
-		render_target.config.height = size.h;
-		render_target.surface.configure(&gpu.device, &render_target.config);
+		for mut render_target in render_targets.iter_mut() {
+			render_target.config.width = size.w;
+			render_target.config.height = size.h;
+			render_target.surface.configure(&gpu.device, &render_target.config);
+		}
 	}
 }

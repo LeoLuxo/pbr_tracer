@@ -91,7 +91,7 @@ impl PartialLayoutEntry {
 }
 
 pub trait ShaderBufferDescriptor {
-	fn as_resource(&self, gpu: &Gpu) -> Sarc<dyn ShaderBufferResource>;
+	fn as_resource(&self, gpu: &Gpu) -> Box<dyn ShaderBufferResource>;
 }
 
 pub trait ShaderBufferResource {

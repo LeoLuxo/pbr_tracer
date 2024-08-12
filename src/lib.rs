@@ -20,7 +20,10 @@ use core::{
 
 use bevy_ecs::schedule::IntoSystemSetConfigs;
 use bevy_tasks::{AsyncComputeTaskPool, TaskPool};
-use brainrot::{bevy::App, size, vec2};
+use brainrot::{
+	bevy::{self, App},
+	size, vec2,
+};
 use fragments::{intersector::*, mpr::MultiPurposeRenderer, post_processing::PostProcessingPipeline, shading::*};
 use image::DynamicImage;
 use rust_embed::Embed;
@@ -48,7 +51,7 @@ impl TextureAssets {
 	}
 }
 
-pub trait EntityLabel {}
+pub trait EntityLabel: bevy::Component {}
 
 /// The default `EventLoop` type to avoid having to add the extra unit type
 type EventLoop = winit::event_loop::EventLoop<()>;

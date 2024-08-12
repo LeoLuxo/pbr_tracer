@@ -4,3 +4,4 @@ pub mod shader;
 pub mod shader_fragment;
 pub mod smart_arc;
 pub mod texture;
+pub mod renderchain;
